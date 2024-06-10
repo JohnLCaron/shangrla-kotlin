@@ -8,15 +8,15 @@ enum class Candidates { ALL, ALL_OTHERS, WRITE_IN, NO_CANDIDATE }
 
 class Contest(
     val id: String,
-    name: String,
+    val name: String,
     val risk_limit: Float,
     val cards: Int,
     val choice_function: SocialChoiceFunction,
-    n_winners: Int,
+    val n_winners: Int,
     val share_to_win: Float,
     val candidates: List<Candidates>,
-    winner: List<Any>,
-    assertion_file: String,
+    val reported_winners: List<Candidates>, // TODO was called winners
+    val assertion_file: String,
     val audit_type: AuditType,
     //test: callable=None,
     g: Float,
@@ -31,26 +31,17 @@ class Contest(
 
     fun find_margins_from_tally() {
         /*
-    Use the `Contest.tally` attribute to set the margins of the contest's assorters.
+        Use the `Contest.tally` attribute to set the margins of the contest's assorters.
 
-    Appropriate only for the social choice functions
-    Contest.SOCIAL_CHOICE_FUNCTION.PLURALITY,
-    Contest.SOCIAL_CHOICE_FUNCTION.SUPERMAJORITY,
-    Contest.SOCIAL_CHOICE_FUNCTION.APPROVAL
+        Appropriate only for the social choice functions
+        Contest.SOCIAL_CHOICE_FUNCTION.PLURALITY,
+        Contest.SOCIAL_CHOICE_FUNCTION.SUPERMAJORITY,
+        Contest.SOCIAL_CHOICE_FUNCTION.APPROVAL
 
-
-    Parameters
-    ----------
-    None
-
-    Returns
-    -------
-    None
-
-    Side effects
-    ------------
-    sets Assertion.margin for all Assertions in the Contest
-    */
+        Side effects
+        ------------
+        sets Assertion.margin for all Assertions in the Contest
+        */
         for ((_, assn) in this.assertions) {
             assn.find_margin_from_tally()
         }
@@ -95,5 +86,72 @@ class Contest(
             )
         }
         return this.sample_size
+    }
+
+    companion object {
+
+        fun tally(contests: List<Contest>, cvr_list: List<CVR>) {
+            /*
+            Tally the votes in the contests from a collection of CVRs.
+            Only tallies plurality, multi-winner plurality, supermajority, and approval contests
+
+            Parameters
+            ----------
+            con_dict: dict; dict of Contest objects to find tallies for
+            cvr_list: list[CVR]; list of CVRs containing the votes to tally
+
+            Returns
+            -------
+
+            Side Effects
+            ------------
+            Sets the `tally` dict for the contests in con_list, if their social choice function is appropriate
+            */
+            //         tallies = {}
+            //        cons = []
+            //        for id, c in con_dict.items():
+            //            if c.choice_function in [Contest.SOCIAL_CHOICE_FUNCTION.PLURALITY,
+            //                                     Contest.SOCIAL_CHOICE_FUNCTION.SUPERMAJORITY,
+            //                                     Contest.SOCIAL_CHOICE_FUNCTION.APPROVAL]:
+            //                cons.append(c)
+            //                c.tally = defaultdict(int)
+            //            else:
+            //                warnings.warn(f'contest {c.id} ({c.name}) has social choice function ' +
+            //                              f'{c.choice_function}: not tabulated')
+            //        for cvr in cvr_list:
+            //            for c in cons:
+            //                if cvr.has_contest(c.id):
+            //                    for candidate, vote in cvr.votes[c.id].items():
+            //                        if candidate:
+            //                            c.tally[candidate] += int(bool(vote))
+            val wantContests = mutableListOf<Contest>()
+            for (contest in contests) {
+                if (contest.choice_function in listOf(
+                        SocialChoiceFunction.PLURALITY,
+                        SocialChoiceFunction.SUPERMAJORITY,
+                        SocialChoiceFunction.APPROVAL
+                    )
+                ) {
+                    wantContests.add(contest)
+                    contest.tally = defaultdict(int)
+                } else {
+                    println("contest ${contest.id} (${contest.name}) has social choice function ${contest.choice_function}: not tabulated")
+                }
+            }
+            for (cvr in cvr_list) {
+                for (contest in wantContests) {
+                    if (cvr.has_contest(contest.id)) {
+                        for ((candidate, vote) in cvr.votes[contest.id]!!) {
+                            if (candidate != null && (vote > 0)) {
+                                // contest.tally[candidate] += int(bool(vote)) // TODO int(bool(vote)) ??
+                                val accum = contest.tally[candidate]!!
+                                contest.tally[candidate] = accum + 1
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
     }
 }

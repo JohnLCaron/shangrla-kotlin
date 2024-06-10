@@ -110,6 +110,36 @@ class Assorter(
         return cvr_assort - mvr_assort
     }
 
+    fun assorter_mean(cvr_list : List<CVR>, use_style: Boolean = true): Float {
+        /*
+        find the mean of the assorter applied to a list of CVRs
+
+                Parameters:
+        ----------
+        cvr_list : list
+        a list of cast -vote records
+                use_style : Boolean
+        does the audit use card style information? If so, apply the assorter only to CVRs
+        that contain the contest in question .
+
+        Returns:
+        ----------
+        mean : float
+        the mean value of the assorter over the list of cvrs.If use_style, ignores CVRs that
+        do not contain the contest .
+        */
+//        if use_style:
+//            filtr = lambda c: c.has_contest(self.contest)
+//        else:
+//            filtr = lambda c: True
+//        return np.mean([self.assorter.assort(c) for c in cvr_list if filtr(c)])
+
+        val wtf = cvr_list.filter { cvr -> if (use_style) cvr.has_contest(this.contest.id) else true }
+            .map { this.assort( it) }
+            .average()
+        return wtf.toFloat() // TODO
+    }
+
     /*
     fun set_tally_pool_means(cvr_list: List<CVR>, use_style: Boolean) {
         /*
