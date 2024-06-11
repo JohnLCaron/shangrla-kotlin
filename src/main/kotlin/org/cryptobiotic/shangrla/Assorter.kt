@@ -3,11 +3,11 @@ package org.cryptobiotic.shangrla
 class Assorter(
     val contest: Contest,
     val assort: (CVR) -> Float, // maps a dict of votes into [0, upper_bound]
-    winner: String,
-    loser: String,
     val upper_bound: Float, // a priori upper bound on the value the assorter can take
-    val tally_pool_means: Map<Any, Float>,
 ) {
+    var winner:  ((CVR) -> Int)? = null
+    var loser: ((CVR) -> Int)? = null
+    var tally_pool_means: Map<String, Float>? = null
 
     fun mean(cvr_list: List<CVR>, use_style: Boolean): Float {
         /*
@@ -140,18 +140,14 @@ class Assorter(
         return wtf.toFloat() // TODO
     }
 
-    /*
-    fun set_tally_pool_means(cvr_list: List<CVR>, use_style: Boolean) {
+    fun set_tally_pool_means(cvr_list: List<CVR>, tally_pool: Set<String>?, use_style: Boolean) {
         /*
         create dict of pool means for the assorter from a set of CVRs
 
         Parameters
         ----------
-        cvr_list: Collection
-        cvrs from which the sample will be drawn
-
-        tally_pools: Collection [optional]
-        the labels of the tally groups
+        cvr_list: cvrs from which the sample will be drawn
+        tally_pools: Collection [optional]; the labels of the tally groups
 
         Returns
         -------
@@ -161,26 +157,43 @@ class Assorter(
         ------------
         sets self.tally_pool_means
         */
+        //         if not tally_pool:
+        //            tally_pool = set(c.tally_pool for c in cvr_list)
+        //        tally_pool_dict = {}
+        //        for p in tally_pool:
+        //            tally_pool_dict[p] = {}
+        //            tally_pool_dict[p]['n'] = 0
+        //            tally_pool_dict[p]['tot'] = 0
+        //        if use_style:
+        //            filtr = lambda c: c.has_contest(self.contest.id)
+        //        else:
+        //            filtr = lambda c: True
+        //        for c in [cvr for cvr in cvr_list if filtr(cvr)]:
+        //            tally_pool_dict[c.tally_pool]['n'] += 1
+        //            tally_pool_dict[c.tally_pool]['tot'] += self.assort(c)
+        //        self.tally_pool_means = {}
+        //        for p in tally_pool:
+        //            self.tally_pool_means[p] = (np.nan if tally_pool_dict[p]['n'] == 0
+        //                                  else tally_pool_dict[p]['tot']/tally_pool_dict[p]['n']
+        //                                 )
 
-        if not tally_pool :
-        tally_pool = set(c.tally_pool for c in cvr_list)
-        tally_pool_dict = {}
-        for p in tally_pool:
-        tally_pool_dict[p] = {}
-        tally_pool_dict[p]['n'] = 0
-        tally_pool_dict[p]['tot'] = 0
-        if use_style:
-        filtr = lambda c : c . has_contest (self.contest.id)
-        else:
-        filtr = lambda c : True
-                for c in [cvr for cvr in cvr_list if filtr(cvr)]:
-        tally_pool_dict[c.tally_pool]['n'] += 1
-        tally_pool_dict[c.tally_pool]['tot'] += self.assort(c)
-        self.tally_pool_means = {}
-        for p in tally_pool:
-        self.tally_pool_means[p] = (np.nan if tally_pool_dict[p]['n'] == 0
-    else tally_pool_dict[p]['tot'] / tally_pool_dict[p]['n']
-        )
+        val tally_set = tally_pool ?: cvr_list.map { it.tally_pool }.toSet()
+        val tally_pool_dict = mutableMapOf<String, Pair<Int, Float>>()
+        for (p in tally_set) {
+            tally_pool_dict[p] = Pair(0, 0.0f)
+        }
+
+        cvr_list.filter { cvr -> if (use_style) cvr.has_contest(this.contest.id) else true }
+            .forEach { cvr ->
+                val (n, tot) = tally_pool_dict[cvr.tally_pool]!!
+                tally_pool_dict[cvr.tally_pool] = Pair(n+1, tot + this.assort(cvr))
+            }
+
+        val pool_means = mutableMapOf<String, Float>()
+        for (p in tally_set) {
+            pool_means[p] = if (tally_pool_dict[p]!!.first == 0) Float.NaN
+                else tally_pool_dict[p]!!.first  / tally_pool_dict[p]!!.second
+        }
+        this.tally_pool_means = pool_means
     }
-     */
 }

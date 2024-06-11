@@ -14,17 +14,17 @@ class Contest(
     val choice_function: SocialChoiceFunction,
     val n_winners: Int,
     val share_to_win: Float,
-    val candidates: List<Candidates>,
-    val reported_winners: List<Candidates>, // TODO was called winners
+    val candidates: List<String>,
+    val reported_winners: List<String>, // TODO was called winners
     val assertion_file: String,
     val audit_type: AuditType,
-    //test: callable=None,
-    g: Float,
-    //estim: callable=None,
-    //bet: callable=None,
+    val test: callable=None,
+    val g: Float,
+    val estim: callable=None,
+    val bet: callable=None,
     val use_style: Boolean,
-    val assertions: Map<String, Assertion>, // TODO why is this a map?
-    val tally: Map<Candidates, Int>,
+    var assertions: Map<String, Assertion>, // TODO why is this a map?
+    var tally: MutableMap<String, Int>,
     var sample_size: Int,
     val sample_threshold: Float,
 ) {
@@ -133,7 +133,7 @@ class Contest(
                     )
                 ) {
                     wantContests.add(contest)
-                    contest.tally = defaultdict(int)
+                    contest.tally = mutableMapOf<String, Int>()
                 } else {
                     println("contest ${contest.id} (${contest.name}) has social choice function ${contest.choice_function}: not tabulated")
                 }

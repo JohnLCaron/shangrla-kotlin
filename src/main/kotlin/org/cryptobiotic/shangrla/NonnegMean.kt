@@ -1,13 +1,28 @@
 package org.cryptobiotic.shangrla
 
+/*
+    Tests of the hypothesis that the mean of a population of values in [0, u] is less than or equal to t.
+        Several tests are implemented, all ultimately based on martingales or supermartingales:
+            Kaplan-Kolmogorov (with and without replacement)
+            Kaplan-Markov (without replacement)
+            Kaplan-Wald (without replacement)
+            Wald SPRT (with and with replacement)
+            ALPHA supermartingale test (with and without replacement)
+            Betting martingale tests (with and without replacement)
+    Some tests work for all nonnegative populations; others require a finite upper bound `u`.
+    Many of the tests have versions for sampling with replacement (`N=np.inf`) and for sampling
+    without replacement (`N` finite).
+    Betting martingales and ALPHA martingales are different parametrizations of the same tests, but
+      lead to different heuristics for selecting the parameters.
+ */
 class NonnegMean (
-    //test: callable=None,
-    //estim: callable=None,
-    //bet: callable=None,
+    val test: callable?,
+    val estim: callable?,
+    val bet: callable?,
     var u: Float = 1.0f,
     val N: Int,
-    t: Float = 0.5f,
-    random_order: Boolean = true,
+    val t: Float = 0.5f,
+    val random_order: Boolean = true,
     val kwargs: Map<String, Any>,
 ) {
 
@@ -86,5 +101,75 @@ class NonnegMean (
 
          */
         return 0
+    }
+
+    companion object {
+
+        // TODO eta: Float=1-np.finfo(float).eps
+        fun alpha_mart(x: Array<Int>, N: Int, t: Float=.5f, eta: Float, u: Float=1.0f, estim: callable=None):
+                Pair<Float, Array<Int>> {
+
+            /*
+            Finds the ALPHA martingale for the hypothesis that the population
+            mean is less than or equal to mu using a martingale method,
+            for a population of size N, based on a series of draws x.
+
+            **The draws must be in random order**, or the sequence is not a supermartingale under the null
+
+            If N is finite, assumes the sample is drawn without replacement
+            If N is infinite, assumes the sample is with replacement
+
+            Parameters
+            ----------
+            x : list corresponding to the data
+            N : int; population size for sampling without replacement, or np.infinity for sampling with replacement
+            t : float in [0,u); hypothesized fraction of ones in the population
+            eta : float in (mu,u]; alternative hypothesized population mean
+            estim : function (note: class methods are not of type Callable)
+                    estim(x, N, mu, eta, u) -> np.array of length len(x), the sequence of values of eta_j for ALPHA
+
+            Returns
+            -------
+            p : float; sequentially valid p-value of the hypothesis that the population mean is less than or equal to mu
+            p_history : numpy array; sample by sample history of p-values. Not meaningful unless the sample is in random order.
+        */
+            //         if not estim:
+            //            estim = TestNonnegMean.shrink_trunc
+            //        S = np.insert(np.cumsum(x),0,0)[0:-1]  # 0, x_1, x_1+x_2, ...,
+            //        j = np.arange(1,len(x)+1)              # 1, 2, 3, ..., len(x)
+            //        m = (N*t-S)/(N-j+1) if np.isfinite(N) else t   # mean of population after (j-1)st draw, if null is true
+            //        etaj = estim(x, N, t, eta, u)
+            //        x = np.array(x)
+            //        with np.errstate(divide='ignore',invalid='ignore'):
+            //            terms = np.cumprod((x*etaj/m + (u-x)*(u-etaj)/(u-m))/u)
+            //        terms[m<0] = np.inf                                         # true mean certainly greater than hypothesized
+            //        terms[m>u] = 1                                              # true mean certainly less than hypothesized
+            //        terms[np.isclose(0, m, atol=2*np.finfo(float).eps)] = 1     # ignore
+            //        terms[np.isclose(u, m, atol=10**-8, rtol=10**-6)] = 1       # ignore
+            //        terms[np.isclose(0, terms, atol=2*np.finfo(float).eps)] = 1 # martingale effectively vanishes; p-value 1
+            //        return min(1, 1/np.max(terms)), np.minimum(1,1/terms)
+
+            if (!estim) {
+                estim = TestNonnegMean.shrink_trunc
+            }
+            val S = np.insert(np.cumsum(x), 0, 0)[0:-1]  # 0, x_1, x_1+x_2, ...,
+            val j = np.arange(1, len(x) + 1)              # 1, 2, 3, ..., len(x)
+            val m =
+                (N * t - S) / (N - j + 1) if np.isfinite(N) else t   # mean of population after (j-1)st draw, if null is true
+            val etaj = estim(x, N, t, eta, u)
+            val x = np.array(x)
+            with (np . errstate (divide = 'ignore', invalid = 'ignore')) {
+                terms = np.cumprod((x * etaj / m + (u - x) * (u - etaj) / (u - m)) / u)
+            }
+            terms[m < 0] =
+                np.inf                                         # true mean certainly greater than hypothesized
+            terms[m > u] = 1                                              # true mean certainly less than hypothesized
+            terms[np.isclose(0, m, atol = 2 * np.finfo(float).eps)] = 1     # ignore
+            terms[np.isclose(u, m, atol = 10 * * - 8, rtol = 10 * * - 6)] = 1       # ignore
+            terms[np.isclose(0, terms, atol = 2 * np.finfo(float).eps)] =
+                1 # martingale effectively vanishes; p - value 1
+
+            return Pair(min(1, 1 / np.max(terms)), np.minimum(1, 1/terms))
+        }
     }
 }

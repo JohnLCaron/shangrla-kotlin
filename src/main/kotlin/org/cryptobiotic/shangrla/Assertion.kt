@@ -1,58 +1,49 @@
 package org.cryptobiotic.shangrla
 
+import org.cryptobiotic.shangrla.reader.make_assertions_from_json
+import kotlin.math.min
+
 /*
     Parameters
         ----------
-        contest: Contest instance
-            contest to which the assorter is relevant
-        winner: str
-            identifier for the nominal "winner" for this assertion. Can be an element of this.contest.candidates,
-            an element of Contest.CANDIDATES, or an arbitrary label.
-            Using an element of this.contest.candidates or an element of Contest.CANDIDATES can be useful for
+        contest: contest to which the assorter is relevant
+        winner: identifier for the nominal "winner" for this assertion. Can be an element of this.contest.candidates,
+            an element of Candidates, or an arbitrary label.
+            Using an element of this.contest.candidates or an element of Candidates can be useful for
             setting the margin in approval, plurality, and supermajority contests.
-        loser: str
-            identifier for the nominal "loser" for this assertion. Can be an element of this.contest.candidates,
-            an element of Contest.CANDIDATES, or an arbitrary label.
-            Using an element of this.contest.candidates or an element of Contest.CANDIDATES can be useful for
+        loser: identifier for the nominal "loser" for this assertion. Can be an element of this.contest.candidates,
+            an element of Candidates, or an arbitrary label.
+            Using an element of this.contest.candidates or an element of Candidates can be useful for
             setting the margin in approval, plurality, and supermajority contests.
-        assorter: Assorter instance
-            the assorter for the assertion
-        margin: float
-            the assorter margin. Generally this will not be known when the assertion is created, but will be set
-            later.
-        test: instance of class NonnegMean
-            the function to find the p-value of the hypothesis that the assertion is true, i.e., that the
-            assorter mean is <=1/2
-        p_value: float
-            the current p-value for the complementary null hypothesis that the assertion is false
-        p_history: list
-            the history of p-values, sample by sample. Generally, it is valid only for sequential risk-measuring
+        assorter: the assorter for the assertion
+        margin: the assorter margin. Generally this will not be known when the assertion is created, but will be set later.
+        test: NonnegMean; the function to find the p-value of the hypothesis that the assertion is true,
+            i.e., that the assorter mean is <=1/2
+        p_value: the current p-value for the complementary null hypothesis that the assertion is false
+        p_history: the history of p-values, sample by sample. Generally, it is valid only for sequential risk-measuring
             functions.
-        proved: boolean
-            has the complementary null hypothesis been rejected?
-        sample_size: int
-            estimated total sample size to complete the audit of this assertion
-        tally_pool_means: dict
-            dict of reported assorter means for each `tally_pool`, for ONEAudit
+        proved: has the complementary null hypothesis been rejected?
+        sample_size: estimated total sample size to complete the audit of this assertion
+        tally_pool_means: dict of reported assorter means for each `tally_pool`, for ONEAudit
  */
 class Assertion(
     val contest: Contest,
     val assorter: Assorter,
-    val winner: Candidates,
-    val loser: Candidates,
+    val winner: String,
+    val loser: String,
     var margin: Float,
     val test: NonnegMean,
     p_value: Float,
     p_history: List<Float>,
     val proved: Boolean,
     var sample_size: Int?,
-    tally_pool_means: Map<Any, Any>,
+    tally_pool_means: Map<String, Float>,
 ) {
     init {
         require(margin > 0) { "Margin ${margin} is nonpositive" }
     }
 
-    //     find the margin for a list of Cvrs.
+    //    The margin for a list of CVRs.
     //    By definition, the margin is twice the mean of the assorter, minus 1.}
     fun margin(cvr_list: List<CVR>, use_style: Boolean): Float {
         return 2 * this.assorter.mean(cvr_list, use_style = use_style) - 1
@@ -64,10 +55,8 @@ class Assertion(
 
         Parameters
         ----------
-        error_rate_1: float
-        the assumed rate of one-vote overstatement errors in the CVRs
-        error_rate_2: float
-        the assumed rate of two-vote overstatement errors in the CVRs
+        error_rate_1: the assumed rate of one-vote overstatement errors in the CVRs
+        error_rate_2: the assumed rate of two-vote overstatement errors in the CVRs
 
         Returns
         -------
@@ -88,7 +77,7 @@ class Assertion(
         /*
         assorter that corresponds to normalized overstatement error for an assertion
 
-        If `use_style == True`, then if the CVR contains the contest but the MVR does not,
+        If `use_style == true`, then if the CVR contains the contest but the MVR does not,
         that is considered to be an overstatement, because the ballot is presumed to contain
         the contest .
 
@@ -121,19 +110,14 @@ class Assertion(
 
         Parameters
         ----------
-        cvr_list: Collection
-        cvrs from which the sample will be drawn
-        use_style: bool
-        is the sample drawn only from ballots that should contain the contest?
-
-        Returns
-        -------
-        nothing
+        cvr_list: cvrs from which the sample will be drawn
+        use_style: is the sample drawn only from ballots that should contain the contest?
 
         Side effects
         ------------
         sets assorter.margin
         */
+
         //         if len(audit.strata) > 1:
         //            raise NotImplementedError('stratified audits not yet supported')
         //        stratum = next(iter(audit.strata.values()))
@@ -167,7 +151,7 @@ class Assertion(
         }
     }
 
-    fun find_margin_from_tally(tallyInput: Map<Candidates, Int>? = null) {
+    fun find_margin_from_tally(tallyInput: Map<String, Int>? = null) {
         /*
         find the assorter margin between implied by a tally.
 
@@ -177,31 +161,27 @@ class Assertion(
 
         Parameters
         ----------
-        tally: dict
-        dict of tallies for the candidates in the contest. Keys are candidates as listed
-        in Contest.candidates. If `tally is None` tries to use the contest.tally.
+        tallyInput: dict of tallies for the candidates in the contest. Keys are candidates as listed
+            in Contest.candidates. If `tally is None` tries to use the contest.tally.
 
         The margin for a supermajority contest with a winner is (see SHANRGLA section 2.3)
-        2(pq/(2f) + (1 − q)/2 - 1/2) = q(p/f-1), where:
-        q is the fraction of cards that have valid votes
-        p is the fraction of cards that have votes for the winner
-        f is the fraction of valid votes required to win.
-
-        Returns
-        -------
-        nothing
+            2(pq/(2f) + (1 − q)/2 - 1/2) = q(p/f-1)
+         where:
+            q is the fraction of cards that have valid votes
+            p is the fraction of cards that have votes for the winner
+            f is the fraction of valid votes required to win.
 
         Side effects
         ------------
         sets this.margin
 
         */
-        //         tally = tally if tally else self.contest.tally
+        //        tally = tally if tally else self.contest.tally
         //        if self.contest.choice_function == Contest.SOCIAL_CHOICE_FUNCTION.PLURALITY \
         //             or self.contest.choice_function == Contest.SOCIAL_CHOICE_FUNCTION.APPROVAL:
         //            self.margin = (tally[self.winner]-tally[self.loser])/self.contest.cards
         //        elif self.contest.choice_function == Contest.SOCIAL_CHOICE_FUNCTION.SUPERMAJORITY:
-        //            if self.winner == Contest.CANDIDATES.NO_CANDIDATE or self.loser != Contest.CANDIDATES.ALL_OTHERS:
+        //            if self.winner == Candidates.NO_CANDIDATE or self.loser != Candidates.ALL_OTHERS:
         //                raise NotImplementedError(f'TO DO: currently only support super-majority with a winner')
         //            else:
         //                q = np.sum([tally[c] for c in self.contest.candidates])/self.contest.cards
@@ -209,11 +189,12 @@ class Assertion(
         //                self.margin = q*(p/self.contest.share_to_win - 1)
         //        else:
         //            raise NotImplementedError(f'social choice function {self.contest.choice_function} not supported')
+
         val tally = tallyInput ?: this.contest.tally
         if (this.contest.choice_function in listOf(SocialChoiceFunction.PLURALITY, SocialChoiceFunction.APPROVAL)) {
             this.margin = (tally[this.winner]!! - tally[this.loser]!!).toFloat() / this.contest.cards // // LOOK check nullable
         } else if (this.contest.choice_function == SocialChoiceFunction.SUPERMAJORITY) {
-            if (this.winner == Candidates.NO_CANDIDATE || this.loser != Candidates.ALL_OTHERS) {
+            if (this.winner == Candidates.NO_CANDIDATE.name || this.loser != Candidates.ALL_OTHERS.name) {
                 throw NotImplementedError("TO DO: currently only support super-majority with a winner")
             } else {
                 // val q = np.sum([tally[c] for c in this.contest.candidates])/this.contest.cards
@@ -229,22 +210,19 @@ class Assertion(
 
     fun make_overstatement(overs: Float, use_style: Boolean = false): Float {
         /*
-    return the numerical value corresponding to an overstatement of `overs` times the assorter upper bound `u`
+        Caclulate the numerical value corresponding to an overstatement of `overs` times the assorter upper bound `u`
+        **Assumes that the margin has been set.**
 
-    **Assumes that the margin has been set.**
+        Parameters
+        ----------
+        overs: the multiple of `u`
+        use_style: flag to use style information. Only used if the assorter margin has not been set
 
-    Parameters
-    ----------
-    overs: float
-    the multiple of `u`
-    use_style: bool
-    flag to use style information. Only used if the assorter margin has not been set
+        Returns
+        -------
+        the numerical value corresponding to an overstatement of that multiple
+        */
 
-    Returns
-    -------
-    the numerical value corresponding to an overstatement of that multiple
-
-    */
         return (1 - overs / this.assorter.upper_bound) / (2 - this.margin / this.assorter.upper_bound)
     }
 
@@ -270,7 +248,7 @@ class Assertion(
     
         Returns
         -------
-        d: np.array; either assorter values or overstatement assorter values, depending on the audit method
+        d: FloatArray; either assorter values or overstatement assorter values, depending on the audit method
         u: upper bound for the test
         */
         val margin = this.margin
@@ -324,7 +302,7 @@ class Assertion(
 
         If `data is None`, constructs values from scratch.
         - For polling audits, values are inferred from the reported tallies. Since contest.tally only reports
-        actual candidate totals, not IRV/RAIRE pseudo-candidates, this is not implemented for IRV.
+            actual candidate totals, not IRV/RAIRE pseudo-candidates, this is not implemented for IRV.
         - For comparison audits, there are two strategies to construct the values:
         1. Systematically interleave small and large values, starting with a small value (`reps is None`)
         2. Sample randomly from a set of such values
@@ -341,7 +319,7 @@ class Assertion(
 
         Parameters
         ----------
-        data: np.array; observations on which to base the calculation. If `data is not None`, uses them in a bootstrap
+        data: FloatArray; observations on which to base the calculation. If `data is not None`, uses them in a bootstrap
             approach, rather than simulating errors.
             If `this.contest.audit_type==Audit.POLLING`, the data should be (simulated or actual) values of
             the raw assorter.
@@ -412,7 +390,7 @@ class Assertion(
         //        return sample_size
         val big = if (this.contest.audit_type == AuditType.POLLING) this.assorter.upper_bound
                   else this.make_overstatement(overs = 0.0f)
-        val small = if (this.contest.audit_type == AuditType.POLLING) 0
+        val small = if (this.contest.audit_type == AuditType.POLLING) 0.0f
                     else this.make_overstatement(overs = 0.5f)
         val rate_1 = rate1 ?: ((1 - this.margin) / 2)   // rate of small values
         var x = FloatArray(this.test.N) { big } // array N floats, all equal to big
@@ -431,10 +409,11 @@ class Assertion(
                 }
             }
         } else if (this.contest.audit_type == AuditType.CARD_COMPARISON) { // # comparison audit
-            //val rate_1_i = np.arange(0, this.test.N, step = int(1 / rate_1), dtype = int) if rate_1 else []
-            //val rate_2_i = np.arange(0, this.test.N, step = int(1 / rate_2), dtype = int) if rate_2 else []
-            //x[rate_1_i] = small
-            //x[rate_2_i] = 0
+            //     arange([start,] stop[, step,], dtype=None, *, like=None) : Return evenly spaced values within a given interval.
+            val rate_1_i = if (rate_1 != null) np.arange(0, this.test.N, step = int(1 / rate_1)) else emptyList()
+            val rate_2_i = if (rate2 != null) np.arange(0, this.test.N, step = int(1 / rate2))  else emptyList()
+            x[rate_1_i] = small
+            x[rate_2_i] = 0.0f
         } else {
             throw NotImplementedError("audit type ${this.contest.audit_type} for contest ${this.contest} not implemented")
         }
@@ -537,6 +516,344 @@ class Assertion(
                 }
             }
             return x
+        }
+
+        fun make_plurality_assertions(contest: Contest, winner: List<String>, loser: List<String>,
+            test: callable?, estim: callable?, bet: callable?, kwargs: Map<String, Any>): Map<String, Assertion> {
+            /*
+            Construct assertions that imply the winner(s) got more votes than the loser(s).
+
+            The assertions are that every winner beat every loser: there are
+            len(winner)*len(loser) pairwise assertions in all.
+
+            Parameters
+            -----------
+            contest: instance of Contest; contest to which the assertions are relevant
+            winner: list; list of identifiers of winning candidate(s)
+            loser: list; list of identifiers of losing candidate(s)
+
+            Returns
+            --------
+            a dict of Assertions
+            */
+            //         assertions = {}
+            //        test = test if test is not None else contest.test
+            //        estim = estim if estim is not None else contest.estim
+            //        bet = bet if bet is not None else contest.bet
+            //        for winr in winner:
+            //            for losr in loser:
+            //                wl_pair = winr + ' v ' + losr
+            //                _test = NonnegMean(test=test, estim=estim, bet=bet, g=contest.g, u=1, N=contest.cards,
+            //                                       t=1/2, random_order=true)
+            //                assertions[wl_pair] = Assertion(contest, winner=winr, loser=losr,
+            //                                         assorter=Assorter(contest=contest,
+            //                                             assort = lambda c, contest_id=contest.id, winr=winr, losr=losr:
+            //                                                 (CVR.as_vote(c.get_vote_for(contest.id, winr))
+            //                                                 - CVR.as_vote(c.get_vote_for(contest.id, losr))
+            //                                                  + 1)/2,
+            //                                            upper_bound=1),
+            //                                         test=_test)
+            //        return assertions
+            val assertions = mutableMapOf<String, Assertion>()
+            val test = test ?: contest.test
+            val estim = estim ?: contest.estim
+            val bet = bet ?: contest.bet
+
+            for (winr in winner) {
+                for (losr in loser) {
+                    val wl_pair = winr + " v " + losr
+                    val _test = NonnegMean(
+                        test = test, estim = estim, bet = bet, g = contest.g, u = 1.0f, N = contest.cards,
+                        t = .5f, random_order = true, kwargs = kwargs)
+
+                    assertions[wl_pair] = Assertion(
+                        contest,
+                        winner = winr,
+                        loser = losr,
+                        assorter = Assorter(
+                            contest = contest,
+                            assort =  { cvr: CVR ->
+                                (CVR.as_vote(cvr.get_vote_for(contest.id, winr)) -
+                                        CVR.as_vote(cvr.get_vote_for(contest.id, losr)) + 1) * 0.5f },
+                            upper_bound = 1.0f,
+                            ),
+                    test = _test)
+                }
+            }
+
+            return assertions
+        }
+
+        fun make_supermajority_assertion(contest: Contest, winner: String, loser: List<String>,
+                test: callable=None, estim: callable=None, bet:callable=None): Map<String, Assertion> {
+            /*
+            Construct assertion that winner got >= share_to_win \in (0,1) of the valid votes
+
+            **TO DO: This method assumes there was a winner. To audit that there was no winner requires
+            flipping things.**
+
+            An equivalent condition is:
+
+            (votes for winner)/(2*share_to_win) + (invalid votes)/2 > 1/2.
+
+            Thus the correctness of a super-majority outcome--where share_to_win >= 1/2--can
+            be checked with a single assertion.
+
+            share_to_win < 1/2 might be useful for some social choice functions, including
+            primaries where candidates who receive less than some threshold share are
+            eliminated.
+
+            A CVR with a mark for more than one candidate in the contest is considered an
+            invalid vote.
+
+            Parameters
+            -----------
+            contest: contest object instance to which the assertion applies
+            winner: identifier of winning candidate
+            loser: list of identifiers of losing candidate(s)
+            share_to_win: float; fraction of the valid votes the winner must get to win
+            test: instance of NonnegMean; risk function for the contest
+            estim: an estimation method of NonnegMean; estimator the alpha_mart test uses for the alternative
+            bet: method to choose the bet for betting_mart risk function
+
+            Returns
+            --------
+            a dict containing one Assertion
+            */
+            //         assertions = {}
+            //        wl_pair = winner + ' v ' + Contest.CANDIDATES.ALL_OTHERS
+            //        cands = loser.copy()
+            //        cands.append(winner)
+            //        _test = NonnegMean(test=test, estim=estim, bet=bet, u=1/(2*contest.share_to_win),
+            //                           N=contest.cards, t=1/2, random_order=True)
+            //        assertions[wl_pair] = Assertion(contest, winner=winner, loser=Contest.CANDIDATES.ALL_OTHERS,
+            //                                 assorter=Assorter(contest=contest,
+            //                                          assort = lambda c, contest_id=contest.id:
+            //                                                CVR.as_vote(c.get_vote_for(contest.id, winner))
+            //                                                      /(2*contest.share_to_win)
+            //                                                if c.has_one_vote(contest.id, cands) else 1/2,
+            //                                          upper_bound=1/(2*contest.share_to_win)), test=_test)
+            //        return assertions
+            val assertions = mutableMapOf<String, Assertion>()
+            val wl_pair = winner + " v " + Candidates.ALL_OTHERS
+            val cands = loser.copy()
+            cands.append(winner)
+            val _test = NonnegMean(
+                test = test, estim = estim, bet = bet, u = 1 / (2 * contest.share_to_win),
+                N = contest.cards, t = 1 / 2, random_order = true
+            )
+            assertions[wl_pair] = Assertion(
+                contest, winner = winner, loser = Candidates.ALL_OTHERS,
+                assorter = Assorter(
+                    contest = contest,
+                    assort =  { cvr: CVR -> if (cvr.has_one_vote(contest.id, cands))
+                        (CVR.as_vote(cvr.get_vote_for(contest.id, winner))
+                        / (2 * contest.share_to_win)) else .5f },
+                upper_bound = 1 / (2 * contest.share_to_win)),
+                test = _test)
+
+            return assertions
+        }
+
+        fun make_all_assertions(contests: List<Contest>) {
+            /*
+            Construct all the assertions to audit the contests and add the assertions to the contest dict
+
+            Parameters
+            ----------
+            contests: dict of Contest objects
+
+            Returns
+            -------
+            true
+
+            Side Effects
+            ------------
+            creates assertions and adds the dict of assertions relevant to each contest to the contest
+            object's `assertions` attribute
+            */
+            //         for c, con in contests.items():
+            //            scf = con.choice_function
+            //            winrs = con.winner
+            //            losrs = list(set(con.candidates) - set(winrs))
+            //            test = con.test
+            //            estim = con.estim
+            //            bet = con.bet
+            //            if scf == Contest.SOCIAL_CHOICE_FUNCTION.PLURALITY:
+            //                contests[c].assertions = Assertion.make_plurality_assertions(contest=con, winner=winrs, loser=losrs,
+            //                                                                                test=test, estim=estim, bet=bet)
+            //            elif scf == Contest.SOCIAL_CHOICE_FUNCTION.SUPERMAJORITY:
+            //                contests[c].assertions = Assertion.make_supermajority_assertion(contest=con, winner=winrs[0],
+            //                                                    loser=losrs, share_to_win=con.share_to_win,
+            //                                                    test=test, estim=estim, bet=bet)
+            //            elif scf == Contest.SOCIAL_CHOICE_FUNCTION.IRV:
+            //                # Assumption: contests[c].assertion_json yields list assertions in JSON format.
+            //                contests[c].assertions = Assertion.make_assertions_from_json(contest=con,
+            //                                                    candidates=con.candidates,
+            //                                                    json_assertions=con.assertion_json,
+            //                                                    test=test, estim=estim, bet=bet)
+            //            else:
+            //                raise NotImplementedError(f'Social choice function {scf} is not implemented.')
+            //        return True
+            for (contest in contests) {
+                val scf = contest.choice_function
+                val winrs = contest.winner
+                val losrs = setOf(contest.candidates).minus(setOf(winrs)).toList()
+                val test = contest.test
+                val estim = contest.estim
+                val bet = contest.bet
+                if (scf == SocialChoiceFunction.PLURALITY) {
+                    contest.assertions = Assertion.make_plurality_assertions(
+                        contest = contest, winner = winrs, loser = losrs,
+                        test = test, estim = estim, bet = bet
+                    )
+                } else if (scf == SocialChoiceFunction.SUPERMAJORITY) {
+                    contest.assertions = Assertion.make_supermajority_assertion(
+                        contest = contest, winner = winrs[0],
+                        loser = losrs, share_to_win = contest.share_to_win,
+                        test = test, estim = estim, bet = bet
+                    )
+                } else if (scf == SocialChoiceFunction.IRV) {
+                    // Assumption: contests[c].assertion_json yields list assertions in JSON format.
+                    contest.assertions = make_assertions_from_json(
+                        contest = contest,
+                        candidates = contest.candidates,
+                        json_assertions = contest.assertion_json,
+                        test = test, estim = estim, bet = bet
+                    )
+                } else {
+                    throw Exception("Social choice function ${scf} is not implemented.")
+                }
+            }
+        }
+
+        fun set_all_margins_from_cvrs(audit: Audit, contests: List<Contest>, cvr_list: List<CVR>): Float {
+            /*
+            Find all the assorter margins in a set of Assertions. Updates the dict of dicts of assertions
+            and the contest dict.
+
+            Appropriate only if cvrs are available. Otherwise, base margins on the reported results.
+
+            This function is primarily about side-effects on the assertions in the contest dict.
+
+            Parameters
+            ----------
+            audit: Audit; information about the audit
+            contests: dict of Contest objects
+            cvr_list: collection of CVR objects
+
+            Returns
+            -------
+            min_margin: float; smallest margin in the audit
+
+            Side effects
+            ------------
+            sets the margin of every assertion
+            sets the assertion.test.u for every assertion, according to whether
+            `assertion.contest.audit_type==Audit.AUDIT_TYPE.POLLING`
+            or `assertion.contest.audit_type in [Audit.AUDIT_TYPE.CARD_COMPARISON, Audit.AUDIT_TYPE.ONEAUDIT]`
+            */
+    //         min_margin = np.infty
+    //        for c, con in contests.items():
+    //            con.margins = {}
+    //            for a, asn in con.assertions.items():
+    //                asn.set_margin_from_cvrs(audit, cvr_list)
+    //                margin = asn.margin
+    //                con.margins.update({a: margin})
+    //                if con.audit_type==Audit.AUDIT_TYPE.POLLING:
+    //                    u = asn.assorter.upper_bound
+    //                elif con.audit_type in [Audit.AUDIT_TYPE.CARD_COMPARISON, Audit.AUDIT_TYPE.ONEAUDIT]:
+    //                    u = 2/(2-margin/asn.assorter.upper_bound)
+    //                else:
+    //                    raise NotImplementedError(f'audit type {con.audit_type} not implemented')
+    //                asn.test.u = u
+    //                min_margin = min(min_margin, margin)
+    //        return min_margin
+            var min_margin = np.infty
+            for (con in contests) {
+                con.margins = {}
+                for (asn in con.assertions) {
+                    asn.set_margin_from_cvrs(audit, cvr_list)
+                    val margin = asn.margin
+                    con.margins.update({ a: margin })
+                    val u = if (con.audit_type == AuditType.POLLING) {
+                        asn.assorter.upper_bound
+                    } else if (con.audit_type in listOf(AuditType.CARD_COMPARISON, AuditType.ONEAUDIT)) {
+                        2 / (2 - margin / asn.assorter.upper_bound)
+                    } else {
+                        throw Exception ("audit type ${con.audit_type} not implemented")
+                    }
+                    asn.test.u = u
+                    min_margin = min(min_margin, margin)
+                }
+            }
+            return min_margin
+        }
+
+        fun set_p_values(contests: List<Contest>, mvr_sample: List<CVR>, cvr_sample: List<CVR>?): Float {
+            /*
+            Find the p-value for every assertion and update assertions & contests accordingly
+
+            update p_value, p_history, proved flag, the maximum p-value for each contest.
+
+            Primarily about side-effects.
+
+            Parameters
+            ----------
+            contests: the contest data structure. outer keys are contest identifiers; inner keys are assertions
+            mvr_sample: list of CVR objects; the manually ascertained voter intent from sheets, including entries for phantoms
+            cvr_sample: list of CVR objects; the cvrs for the same sheets, for ballot-level comparison audits not needed for polling audits
+
+            Returns
+            -------
+            p_max: float; largest p-value for any assertion in any contest
+
+            Side-effects
+            ------------
+            Sets u for every test for every assertion, according to whether the corresponding audit method
+            is Audit.AUDIT_TYPE.CARD_COMPARISON, Audit.AUDIT_TYPE.ONEAUDIT, or Audit.AUDIT_TYPE.POLLING.
+            Sets contest max_p to be the largest P-value of any assertion for that contest
+            Updates p_value, p_history, and proved for every assertion
+            */
+    //         if cvr_sample is not None:
+    //            assert len(mvr_sample) == len(cvr_sample), "unequal numbers of cvrs and mvrs"
+    //        p_max = 0
+    //        for c, con in contests.items():
+    //            con.p_values = {}
+    //            con.proved = {}
+    //            contest_max_p = 0
+    //            for a, asn in con.assertions.items():
+    //                d, u = asn.mvrs_to_data(mvr_sample, cvr_sample)
+    //                asn.test.u = u       # set upper bound for the test for each assorter
+    //                asn.p_value, asn.p_history = asn.test.test(d)
+    //                asn.proved = (asn.p_value <= con.risk_limit) or asn.proved
+    //                con.p_values.update({a: asn.p_value})
+    //                con.proved.update({a: asn.proved})
+    //                contest_max_p = np.max([contest_max_p, asn.p_value])
+    //            contests[c].max_p = contest_max_p
+    //            p_max = np.max([p_max, contests[c].max_p])
+    //        return p_max
+            if (cvr_sample != null) {
+                require(mvr_sample.size == cvr_sample.size) {"unequal numbers of cvrs and mvrs"}
+            }
+            var p_max = 0.0f
+            for (con in contests) {
+                con.p_values = {}
+                con.proved = {}
+                var contest_max_p = 0
+                for (asn in con.assertions) {
+                    val (d, u) = asn.mvrs_to_data(mvr_sample, cvr_sample)
+                    asn.test.u = u       // set upper bound for the test for each assorter
+                    asn.p_value, asn.p_history = asn.test.test(d)
+                    asn.proved = (asn.p_value <= con.risk_limit) or asn.proved
+                    con.p_values.update({ a: asn.p_value })
+                    con.proved.update({ a: asn.proved })
+                    contest_max_p = np.max([contest_max_p, asn.p_value])
+                }
+                contests[c].max_p = contest_max_p
+                p_max = np.max([p_max, contests[c].max_p])
+            }
+            return p_max
         }
     }
 }
