@@ -1,4 +1,4 @@
-package org.cryptobiotic.shangrla
+package org.cryptobiotic.shangrla.core
 
 import kotlin.math.max
 
@@ -9,24 +9,24 @@ enum class Candidates { ALL, ALL_OTHERS, WRITE_IN, NO_CANDIDATE }
 class Contest(
     val id: String,
     val name: String,
-    val risk_limit: Float,
-    val cards: Int,
+    val risk_limit: Double = 0.05,
+    val cards: Int = 0,
     val choice_function: SocialChoiceFunction,
-    val n_winners: Int,
-    val share_to_win: Float,
+    val n_winners: Int = 1,
+    val share_to_win: Double,
     val candidates: List<String>,
-    val reported_winners: List<String>, // TODO was called winners
+    val reported_winners: List<String>, // TODO was called winners?
     val assertion_file: String,
-    val audit_type: AuditType,
-    val test: callable=None,
-    val g: Float,
-    val estim: callable=None,
-    val bet: callable=None,
-    val use_style: Boolean,
+    val audit_type: AuditType = AuditType.CARD_COMPARISON,
+    val testFn: TestFn?,
+    val g: Double = 0.1,
+    val estimFn: EstimatorFn?,
+    val bet: BetFn?,
+    val use_style: Boolean = true,
     var assertions: Map<String, Assertion>, // TODO why is this a map?
     var tally: MutableMap<String, Int>,
     var sample_size: Int,
-    val sample_threshold: Float,
+    val sample_threshold: Double,
 ) {
 
     fun find_margins_from_tally() {

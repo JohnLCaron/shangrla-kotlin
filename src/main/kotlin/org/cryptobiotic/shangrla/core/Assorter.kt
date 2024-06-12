@@ -1,37 +1,15 @@
-package org.cryptobiotic.shangrla
+package org.cryptobiotic.shangrla.core
 
 class Assorter(
     val contest: Contest,
-    val assort: (CVR) -> Float, // maps a dict of votes into [0, upper_bound]
-    val upper_bound: Float, // a priori upper bound on the value the assorter can take
+    val assort: (CVR) -> Double, // maps a dict of votes into [0, upper_bound]
+    val upper_bound: Double, // a priori upper bound on the value the assorter can take
 ) {
     var winner:  ((CVR) -> Int)? = null
     var loser: ((CVR) -> Int)? = null
-    var tally_pool_means: Map<String, Float>? = null
+    var tally_pool_means: MutableMap<String, Double>? = null
 
-    fun mean(cvr_list: List<CVR>, use_style: Boolean): Float {
-        /*
-        find the mean of the assorter applied to a list of CVRs
-
-        Parameters
-        ----------
-        cvr_list: a collection of cast-vote records
-        use_style: does the audit use card style information? If so, apply the assorter only to CVRs
-        that contain the contest in question.
-
-        Returns
-        -------
-        the mean value of the assorter over the collection of cvrs. If use_style, ignores CVRs that
-        do not contain the contest.
-        */
-
-        return cvr_list.filter{cvr -> if (use_style) { cvr.has_contest(this.contest.id) } else true }
-            .map { this.assort( it) }
-            .average()
-            .toFloat() // TODO use double??
-    }
-
-    fun sum(cvr_list: List<CVR>, use_style: Boolean): Float {
+    fun sum(cvr_list: List<CVR>, use_style: Boolean): Double {
         /*
         find the mean of the assorter applied to a list of CVRs
 
@@ -58,7 +36,7 @@ class Assorter(
             .sum()
     }
 
-    fun overstatement(mvr : CVR, cvr: CVR, use_style: Boolean = true): Float {
+    fun overstatement(mvr : CVR, cvr: CVR, use_style: Boolean = true): Double {
         /*
         overstatement error for a CVR compared to the human reading of the ballot
 
@@ -88,10 +66,10 @@ class Assorter(
         //        mvr_assort = (0 if mvr.phantom or (use_style and not mvr.has_contest(self.contest.id))
         //                      else self.assort(mvr)
         //                     )
-        //        # assort the CVR
-        //        cvr_assort = (self.tally_pool_means[cvr.tally_pool] if cvr.pool
+        //         # assort the CVR
+        //        cvr_assort = (self.tally_pool_means[cvr.tally_pool] if cvr.pool and self.tally_pool_means is not None
         //                      else int(cvr.phantom)/2 + (1-int(cvr.phantom))*self.assort(cvr)
-        //                     )
+//                     )
         //        return cvr_assort - mvr_assort
 
         // sanity check
@@ -99,18 +77,18 @@ class Assorter(
             throw Exception("use_style==True but ${cvr} does not contain contest ${this.contest.id}")
         }
         // assort the MVR
-        val mvr_assort = if (mvr.phantom or (use_style && !mvr.has_contest (this.contest.id))) 0.0f
+        val mvr_assort = if (mvr.phantom || (use_style && !mvr.has_contest (this.contest.id))) 0.0
                          else this.assort(mvr)
 
         // assort the CVR
         val phantomValue = if (cvr.phantom) 1 else 0 // TODO really ? int(cvr.phantom)
-        val cvr_assort: Float = if (cvr.pool) this.tally_pool_means[cvr.tally_pool]!!
+        val cvr_assort: Double = if (cvr.pool && this.tally_pool_means != null) this.tally_pool_means!![cvr.tally_pool]!!
                          else phantomValue / 2 + (1 - phantomValue) * this.assort(cvr)
 
         return cvr_assort - mvr_assort
     }
 
-    fun assorter_mean(cvr_list : List<CVR>, use_style: Boolean = true): Float {
+    fun mean(cvr_list : List<CVR>, use_style: Boolean = true): Double {
         /*
         find the mean of the assorter applied to a list of CVRs
 
@@ -134,10 +112,9 @@ class Assorter(
 //            filtr = lambda c: True
 //        return np.mean([self.assorter.assort(c) for c in cvr_list if filtr(c)])
 
-        val wtf = cvr_list.filter { cvr -> if (use_style) cvr.has_contest(this.contest.id) else true }
+        return cvr_list.filter { cvr -> if (use_style) cvr.has_contest(this.contest.id) else true }
             .map { this.assort( it) }
             .average()
-        return wtf.toFloat() // TODO
     }
 
     fun set_tally_pool_means(cvr_list: List<CVR>, tally_pool: Set<String>?, use_style: Boolean) {
@@ -178,9 +155,9 @@ class Assorter(
         //                                 )
 
         val tally_set = tally_pool ?: cvr_list.map { it.tally_pool }.toSet()
-        val tally_pool_dict = mutableMapOf<String, Pair<Int, Float>>()
+        val tally_pool_dict = mutableMapOf<String, Pair<Int, Double>>()
         for (p in tally_set) {
-            tally_pool_dict[p] = Pair(0, 0.0f)
+            tally_pool_dict[p] = Pair(0, 0.0)
         }
 
         cvr_list.filter { cvr -> if (use_style) cvr.has_contest(this.contest.id) else true }
@@ -189,9 +166,9 @@ class Assorter(
                 tally_pool_dict[cvr.tally_pool] = Pair(n+1, tot + this.assort(cvr))
             }
 
-        val pool_means = mutableMapOf<String, Float>()
+        val pool_means = mutableMapOf<String, Double>()
         for (p in tally_set) {
-            pool_means[p] = if (tally_pool_dict[p]!!.first == 0) Float.NaN
+            pool_means[p] = if (tally_pool_dict[p]!!.first == 0) Double.NaN
                 else tally_pool_dict[p]!!.first  / tally_pool_dict[p]!!.second
         }
         this.tally_pool_means = pool_means

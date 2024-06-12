@@ -1,4 +1,4 @@
-package org.cryptobiotic.shangrla
+package org.cryptobiotic.shangrla.core
 
 /*
     Generic class for cast-vote records.
@@ -72,8 +72,8 @@ class CVR (
     var phantom: Boolean,
     var tally_pool: String,    // what tallying pool of cards does this CVR belong to (used by ONEAudit)? TODO String?
     var pool: Boolean,      // pool votes on this CVR within its tally_pool?
-    val sample_num: Float,  // pseudorandom number used for consistent sampling
-    var p: Float,           // sampling probability
+    val sample_num: Double,  // pseudorandom number used for consistent sampling
+    var p: Double,           // sampling probability
     val sampled: Boolean,   // is this CVR in the sample?
 ) {
     val mvotes = mutableMapOf<String, MutableMap<String, Int>>() // Map(contestId, Map(selectionId, vote))
@@ -363,6 +363,8 @@ class CVR (
         }
             return od.values.toList()
         }
+
+        /*
 
         fun make_phantoms(max_cards: Int, cvr_list: List<CVR>, contests: List<Contest>, use_style: Boolean=true, prefix: String = "")
         : Pair<List<CVR>, Int> {
@@ -778,6 +780,7 @@ class CVR (
             }
             return d
         }
+         */
 
     }
 

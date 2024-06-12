@@ -1,6 +1,7 @@
 package org.cyrptobiotic.shangrla
 
 import org.cryptobiotic.shangrla.*
+import org.cryptobiotic.shangrla.core.*
 import kotlin.test.Test
 
 class TestAssertion {
@@ -11,17 +12,14 @@ class TestAssertion {
         plur_con_test = Contest(
             id = "AvB",
             name = "AvB",
-            risk_limit = 0.05f,
             cards = 4,
             choice_function = SocialChoiceFunction.PLURALITY,
-            n_winners = 1,
             // candidates = 3,
             candidates = listOf("Alice","Bob","Candy"),
             reported_winners = listOf("Alice"),
             audit_type = AuditType.CARD_COMPARISON,
             test = NonnegMean.alpha_mart,
             estim = NonnegMean.optimal_comparison,
-            use_style = true,
         )
         
         // assertion without a margin

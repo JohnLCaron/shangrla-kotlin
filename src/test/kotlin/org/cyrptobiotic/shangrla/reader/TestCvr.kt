@@ -1,6 +1,7 @@
 package org.cyrptobiotic.shangrla.reader
 
 import org.cryptobiotic.shangrla.*
+import org.cryptobiotic.shangrla.core.*
 import org.cryptobiotic.shangrla.reader.sigfig
 import org.cyrptobiotic.shangrla.AssertionUtils
 import org.cyrptobiotic.shangrla.AssertionUtils.Companion.find_margins
@@ -122,6 +123,7 @@ class TestCvr {
         }
     }
 
+    /*
     @Test
     fun testAudit() {
         val fake_cvrs = generate_fake_cvrs(contest_dict, style_dict)
@@ -132,7 +134,7 @@ class TestCvr {
         val risk_function = "alpha_mart"
 
         // because comparison audit, may want to add f parameter to bias alpha towards u
-        val risk_fn = lambda x, m, N: TestNonnegMean.alpha_mart(x, eta=(m+1)/2 , N=N, f=.1)
+        val risk_fn = { (x: DoubleArray, m, N) -> NonnegMean.alpha_mart(x, eta=(m+1)/2 , N=N, f=.1) }
         val g = 0.1
         val max_cards = 800
         val error_rate = 0.002
@@ -140,43 +142,43 @@ class TestCvr {
         // class Contest(
         //    val id: String,
         //    name: String,
-        //    val risk_limit: Float,
+        //    val risk_limit: Double,
         //    val cards: Int,
         //    val choice_function: SocialChoiceFunction,
         //    n_winners: Int,
-        //    val share_to_win: Float,
+        //    val share_to_win: Double,
         //    val candidates: List<Candidates>,
         //    winner: List<Any>,
         //    assertion_file: String,
         //    val audit_type: AuditType,
         //    //test: callable=None,
-        //    g: Float,
+        //    g: Double,
         //    //estim: callable=None,
         //    //bet: callable=None,
         //    val use_style: Boolean,
         //    val assertions: Map<String, Assertion>, // TODO why is this a map?
         //    val tally: Map<Candidates, Int>,
         //    var sample_size: Int,
-        //    val sample_threshold: Float,
+        //    val sample_threshold: Double,
         //)
 
         // Audit contest 2
         val contests: List<Contest> = listOf(
-            Contest("Contest 1", risk_limit = 0.05f,
+            Contest("Contest 1",
                 cards = 600,
                 choice_function = SocialChoiceFunction.PLURALITY,
                 n_winners = 1,
                 candidates = listOf("Candidate A", "Candidate B"),
                 reported_winners = "Candidate A",   // TODO no such field
             ),
-            Contest("Contest 2", risk_limit = 0.05f,
+            Contest("Contest 2",
                 cards = 600,
                 choice_function = SocialChoiceFunction.PLURALITY,
                 n_winners = 1,
                 candidates = listOf("Candidate A", "Candidate B"),
                 reported_winners = "Candidate A",
             ),
-            Contest("Contest 1", risk_limit = 0.05f,
+            Contest("Contest 1",
                 cards = 600,
                 choice_function = SocialChoiceFunction.PLURALITY,
                 n_winners = 1,
@@ -221,7 +223,10 @@ class TestCvr {
         //{"Contest 1": 48, "Contest 2": 17, "Contest 4": 9}
         //50.99999999999999
     }
-    
+
+     */
+
+    /*
     @Test
     fun testMakePhantoms() {
         val contests =  listOf(
@@ -288,5 +293,7 @@ class TestCvr {
 
          */
     }
+
+     */
 
 }

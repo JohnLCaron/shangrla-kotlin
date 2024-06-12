@@ -1,4 +1,4 @@
-package org.cryptobiotic.shangrla
+package org.cryptobiotic.shangrla.core
 
 import kotlin.math.ceil
 import kotlin.math.max
@@ -25,9 +25,9 @@ class Audit(
     sample_file: String,
     mvr_file: String,
     log_file: String,
-    val quantile: Float,
-    val error_rate_1: Float,
-    val error_rate_2: Float,
+    val quantile: Double,
+    val error_rate_1: Double,
+    val error_rate_2: Double,
     val reps: Int,
     max_cards: Int,
     val strata: Map<String, Stratum>,
@@ -157,24 +157,24 @@ class Audit(
 //        else:
 //            total_size = np.max(np.array([con.sample_size for con in contests.values()]))
 //        return total_size
-        var total_size = 0
+        var total_size: Int
         if (stratum.use_style) {
             requireNotNull(cvrs)
             for (cvr in cvrs) {
                 if (cvr.sampled) {
-                    cvr.p = 1.0f
+                    cvr.p = 1.0
                 } else {
-                    cvr.p = 0.0f
+                    cvr.p = 0.0
                     for ((c, con) in contests) {
                         if (cvr.has_contest(c) && !cvr.sampled) {
                             val p1 = con.sample_size / (con.cards - old_sizes[c]!!)
-                            cvr.p = max(p1.toFloat(), cvr.p) // TODO nullability
+                            cvr.p = max(p1.toDouble(), cvr.p) // TODO nullability
                         }
                     }
                 }
             }
             // total_size = ceil(np.sum([x.p for x in cvrs if !x.phantom))
-            val summ: Float = cvrs.filter { !it.phantom }.map { it.p }.sum()
+            val summ: Double = cvrs.filter { !it.phantom }.map { it.p }.sum()
             total_size = ceil(summ).toInt()
         } else {
             // total_size = np.max(np.array([con.sample_size for con in contests.values()]))

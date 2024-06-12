@@ -1,13 +1,17 @@
 package org.cryptobiotic.shangrla.reader
 
 import org.cryptobiotic.shangrla.*
-import org.cryptobiotic.shangrla.Contest
+import org.cryptobiotic.shangrla.core.*
+import org.cryptobiotic.shangrla.core.Contest
 
 // TODO json_assertions: dict, not Map<String, Assertion>
 fun make_assertions_from_json(
-    contest: Contest, candidates: List<String>,
-    json_assertions: Map<String, Assertion>, test: callable = None,
-    estim: callable = None, bet: callable = None
+    contest: Contest,
+    candidates: List<String>,
+    json_assertions: Map<String, Assertion>,
+    test: TestFn?,
+    estim: EstimatorFn?,
+    bet: BetFn?
 ): Map<String, Assertion> {
     /*
     dict of Assertion objects from a RAIRE-style json representations of assertions.

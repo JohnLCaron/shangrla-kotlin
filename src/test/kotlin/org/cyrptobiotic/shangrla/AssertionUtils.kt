@@ -1,15 +1,15 @@
 package org.cyrptobiotic.shangrla
 
-import org.cryptobiotic.shangrla.CVR
-import org.cryptobiotic.shangrla.Contest
-import org.cryptobiotic.shangrla.SocialChoiceFunction
+import org.cryptobiotic.shangrla.core.CVR
+import org.cryptobiotic.shangrla.core.Contest
+import org.cryptobiotic.shangrla.core.SocialChoiceFunction
 import kotlin.math.max
 import kotlin.math.min
 
 class AssertionUtils {
 
     companion object {
-        fun find_sample_size(contests: List<Contest>, sample_size_function: (Float, Float) -> Int): Int {
+        fun find_sample_size(contests: List<Contest>, sample_size_function: (Double, Double) -> Int): Int {
             /*
         Find initial sample size : maximum across assertions for all contests .
 
@@ -36,7 +36,7 @@ class AssertionUtils {
             return sample_size
         }
 
-        fun check_audit_parameters(risk_function: String, g: Float, error_rate: Float, contests: Map<String, Contest>) {
+        fun check_audit_parameters(risk_function: String, g: Double, error_rate: Double, contests: Map<String, Contest>) {
             /*
             Check whether the audit parameters are valid; complain if not.
     
@@ -80,7 +80,7 @@ class AssertionUtils {
             }
         }
 
-        fun find_margins(contests: List<Contest>, cvr_list : List<CVR>, use_style : Boolean): Float {
+        fun find_margins(contests: List<Contest>, cvr_list : List<CVR>, use_style : Boolean): Double {
             /*
             Find all the assorter margins in a set of Assertions. Updates the dict of dicts of assertions,
             and the contest dict.
@@ -113,7 +113,7 @@ class AssertionUtils {
             //            min_margin = np.min([min_margin, margin])
             //    return min_margin
 
-            var min_margin = Float.POSITIVE_INFINITY
+            var min_margin = Double.POSITIVE_INFINITY
             for (contest in contests) {
                 //contest.margins = {} TODO
                 for (a in contest.assertions.values) {
