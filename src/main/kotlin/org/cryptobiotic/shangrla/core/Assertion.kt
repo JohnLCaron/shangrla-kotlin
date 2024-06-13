@@ -2,7 +2,6 @@ package org.cryptobiotic.shangrla.core
 
 import kotlinx.serialization.MissingFieldException
 import kotlinx.serialization.internal.throwMissingFieldException
-import org.cryptobiotic.shangrla.reader.make_assertions_from_json
 import kotlin.math.min
 
 /*

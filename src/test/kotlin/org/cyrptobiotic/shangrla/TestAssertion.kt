@@ -4,6 +4,7 @@ import org.cryptobiotic.shangrla.*
 import org.cryptobiotic.shangrla.core.*
 import kotlin.test.Test
 
+/*
 class TestAssertion {
     val plur_con_test : Contest
     val raw_AvB_asrtn : Assertion
@@ -119,3 +120,4 @@ class TestAssertion {
         np.testing.assert_almost_equal(self.raw_AvB_asrtn.assorter.tally_pool_means["2"], 0)
     }
 }
+ */

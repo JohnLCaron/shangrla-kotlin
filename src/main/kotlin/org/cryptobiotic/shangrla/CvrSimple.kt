@@ -91,7 +91,7 @@ fun make_phantoms(max_cards: Int, cvr_list: List<CvrSimple>, contests: List<Cont
         }
     } else {                         // create phantom CVRs as needed for each contest
         for (contest in contests) {
-            val phantoms_needed = contest.cards - contest.cvrs
+            val phantoms_needed = contest.cards!! // TODO - contest.cvrs
             repeat(phantoms_needed) {
                 val votes = mutableMapOf<String, Map<String, Int>>()
                 votes[contest.id] = emptyMap() // list contest c on the phantom CVR
@@ -103,4 +103,4 @@ fun make_phantoms(max_cards: Int, cvr_list: List<CvrSimple>, contests: List<Cont
     val result = cvr_list + phantom_vrs
     return Pair(result, n_phantoms)
 }
-}
+

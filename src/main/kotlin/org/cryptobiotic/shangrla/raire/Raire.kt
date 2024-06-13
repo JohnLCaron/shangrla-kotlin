@@ -147,7 +147,7 @@ fun compute_raire_assertions(
 
     // This is a running lowerbound on the overall difficulty of the
     // election audit.
-    var lowerbound = -10
+    var lowerbound = -10.0
 
 // Construct initial frontier.
     val frontier = RaireFrontier()
@@ -350,7 +350,7 @@ fun compute_raire_assertions(
     // Some assertions will be used to rule out multiple branches of our
     // alternate outcome tree. Form a list of all these assertions, without
     // duplicates.
-    val assertions = mutableListOf<NEBAssertion>()
+    val assertions : MutableList<RaireAssertion> = mutableListOf()
 
     //     for node in frontier.nodes:
     //        skip = False
@@ -377,21 +377,37 @@ fun compute_raire_assertions(
 
     // Assertions will be sorted in order of how much of the alternate
     // outcome space they rule out (most to least).
-    val sorted_assertions = assertions.sort()
-    val len_assertions = sorted_assertions.size
+    assertions.sortWith{ o1, o2 -> 0 }
 
     val final_audit = mutableListOf<Assertion>()
 
-    if (sorted_assertions.isNotEmpty()) {
-        var final_audit = [sorted_assertions.pop(0)]
+    //     if sorted_assertions != []:
+    //        final_audit = [sorted_assertions.pop(0)]
+    //
+    //        for assertion in sorted_assertions:
+    //            subsumed = False
+    //            for fasrtn in final_audit:
+    //                if fasrtn.subsumes(assertion):
+    //                    fasrtn.rules_out.update(assertion.rules_out)
+    //                    if log:
+    //                        print("{} SUBSUMES {}".format(fasrtn.to_str(),
+    //                            assertion.to_str()), file=stream)
+    //
+    //                    subsumed = True
+    //                    break
+    //
+    //            if not subsumed:
+    //                final_audit.append(assertion)
 
-        for (assertion in sorted_assertions) {
+    if (assertions.isNotEmpty()) {
+        val final_audit = mutableListOf(assertions.removeAt(0))
+
+        for (assertion in assertions) {
             var subsumed = false
             for (fasrtn in final_audit) {
                 if (fasrtn.subsumes(assertion)) {
-                    fasrtn.rules_out.update(assertion.rules_out)
+                    fasrtn.rules_out.addAll(assertion.rules_out)
                     // if (log) print("{} SUBSUMES {}".format(fasrtn.to_str(), assertion.to_str()), file = stream)
-
                     subsumed = true
                     break
                 }

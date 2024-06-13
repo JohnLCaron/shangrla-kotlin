@@ -29,7 +29,7 @@ class AssertionUtils {
                 val risk = c.risk_limit
                 for (a in c.assertions.values) {
                     val margin = a.margin
-                    val n = sample_size_function(margin, risk)
+                    val n = sample_size_function(margin!!, risk)
                     sample_size = max(sample_size, n)
                 }
             }
@@ -71,9 +71,11 @@ class AssertionUtils {
                 if (contest.choice_function in listOf(SocialChoiceFunction.IRV, SocialChoiceFunction.SUPERMAJORITY)) {
                     assert(contest.n_winners == 1) { "${contest.choice_function} can have only 1 winner in $contest" }
                 }
-                if (contest.choice_function == SocialChoiceFunction.IRV) {
+                /* if (contest.choice_function == SocialChoiceFunction.IRV) {
                     assert(contest.assertion_file != null) { "IRV contest $contest requires an assertion file" }
                 }
+                // TODO
+                 */
                 if (contest.choice_function == SocialChoiceFunction.SUPERMAJORITY) {
                     assert(contest.share_to_win >= 0.5) { "super-majority contest requires winning at least 50% of votes in $contest" }
                 }

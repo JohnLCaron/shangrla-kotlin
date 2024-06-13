@@ -4,7 +4,7 @@ import org.cryptobiotic.shangrla.*
 import org.cryptobiotic.shangrla.core.*
 import org.cryptobiotic.shangrla.core.Contest
 
-// TODO json_assertions: dict, not Map<String, Assertion>
+/*
 fun make_assertions_from_json(
     contest: Contest,
     candidates: List<String>,
@@ -131,3 +131,4 @@ fun make_assertions_from_json(
     }
     return assertions
 }
+ */

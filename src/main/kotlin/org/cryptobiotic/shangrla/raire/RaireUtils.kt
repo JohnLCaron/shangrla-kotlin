@@ -1,16 +1,18 @@
 package org.cryptobiotic.shangrla.raire
 
 import org.cryptobiotic.shangrla.core.CVR
+import kotlin.math.max
 
 
 data class Contest(
-    val name: String, 
-    val candidates: List<String>, 
-    val winner:String, 
+    val name: String,
+    val candidates: List<String>,
+    val winner: String,
     val tot_ballots: Int,
-    val order: IntArray
+    val outcome: IntArray
 )
 
+/*
 fun load_contests_from_txt(path: String) {
     /*
         Format:
@@ -36,7 +38,7 @@ fun load_contests_from_txt(path: String) {
 
     var tot_auditable_ballots = 0
 
-    with (open (path, "r") as data) {
+    with(open(path, "r") as data) {
         val lines = data.readlines()
 
         val toks = [line.strip() for line in lines[0].strip().split(',')]
@@ -91,7 +93,7 @@ fun load_contests_from_raire(path: String) {
 
 //  A map between ballot id and the relevant CVR.
     val cvrs = {}
-    with (open (path, "r") as data) {
+    with(open(path, "r") as data) {
         val lines = data.readlines()
 
 //  Total number of contests described in data file
@@ -192,6 +194,8 @@ fun index_of(cand, list_of_cand) {
     return -1
 }
 
+ */
+
 fun ranking(cand: String, ballot: Map<String, Int>): Int {
     /*
     Input:
@@ -238,7 +242,7 @@ fun vote_for_cand(cand: String, eliminated: List<String>, ballot: Map<String, In
 }
 
 
-open class RaireAssertion(val contest_name: String, val winner: String, val loser: String) {
+open class RaireAssertion(val contest_name: String, val winner: String, val loser: String): Comparable<RaireAssertion> {
     /*
         Initializes a RAIRE assertion involving a comparison between
         the tallies of a candidate labelled 'winner' and a candidate
@@ -258,9 +262,9 @@ open class RaireAssertion(val contest_name: String, val winner: String, val lose
     var margin = -1
     var difficulty = Double.POSITIVE_INFINITY
 
-    val rules_out = mutableSetOf<String>()
+    val rules_out = mutableSetOf<RaireAssertion>()
 
-    fun is_vote_for_winner(cvr: CVR): Int {
+    open fun is_vote_for_winner(cvr: CVR): Int {
         /*
         Input:
             cvr - cast vote record
@@ -272,7 +276,7 @@ open class RaireAssertion(val contest_name: String, val winner: String, val lose
         return 0 // TODO
     }
 
-    fun is_vote_for_loser(cvr: CVR): Int {
+    open fun is_vote_for_loser(cvr: CVR): Int {
         /*
         Input:
             cvr - cast vote record
@@ -284,32 +288,31 @@ open class RaireAssertion(val contest_name: String, val winner: String, val lose
         return 0 // TODO
     }
 
-    fun subsumes(other: RaireAssertion): Boolean {
+    open fun subsumes(other: RaireAssertion): Boolean {
         /*
-    Returns true if this assertion 'subsumes' the input assertion 'other'.
-    An assertion 'A' subsumes assertion 'B' if the alternate outcomes
-    ruled out by 'B' is a subset of those ruled out by 'A'. If we include
-    'A' in an audit, we don't need to include 'B'.
-    
-    Input:
-    other : RaireAssertion   - Assertion 'B'
-    
-    Output:
-    Returns true if this assertion subsumes assertion 'other'.
-    */
+        Returns true if this assertion 'subsumes' the input assertion 'other'.
+        An assertion 'A' subsumes assertion 'B' if the alternate outcomes
+        ruled out by 'B' is a subset of those ruled out by 'A'. If we include
+        'A' in an audit, we don't need to include 'B'.
+
+        Input:
+        other : RaireAssertion   - Assertion 'B'
+
+        Output:
+        Returns true if this assertion subsumes assertion 'other'.
+        */
         return true // TODO
     }
 
-    fun same_as(other: RaireAssertion): Boolean {
-    /*
-    Returns true  if this assertion is equal to 'other' (i.e., they
-    are the same assertion), and false  otherwise.
-    */
+    open fun same_as(other: RaireAssertion): Boolean {
+        /*
+        Returns true  if this assertion is equal to 'other' (i.e., they
+        are the same assertion), and false  otherwise.
+        */
         return true // TODO
     }
 
-    //  Assertions are ordered in terms of how many alternate outcomes that
-    //  they are able to rule out.
+    /*  Assertions are ordered in terms of how many alternate outcomes that they are able to rule out.
     fun __lt__(other: RaireAssertion) {
         val self_rule_out = if (!this.rules_out) -1 else min([len(ro) for ro in this.rules_out])
 
@@ -329,12 +332,18 @@ open class RaireAssertion(val contest_name: String, val winner: String, val lose
         return self_rule_out > other_rule_out
     }
 
-    fun display(stream = sys.stdout) {
-        print(this.to_str(), file = stream)
+     */
+
+    open fun to_str(): String {
+        return "TODO"
     }
 
-    fun to_str(): String {
-        return "TODO"
+    override fun compareTo(other: RaireAssertion): Int {
+        //         val self_rule_out = if (!this.rules_out) -1 else min([len(ro) for ro in this.rules_out])
+        val self_rule_out = if (this.rules_out.isEmpty()) -1 else 0 // this.rules_out.map { it.size }.min() TODO
+        val other_rule_out = if (other.rules_out.isEmpty()) -1 else 0 // other.rules_out.map { it.size }.min()
+
+        return self_rule_out - other_rule_out
     }
 }
 
@@ -356,28 +365,28 @@ class NEBAssertion(contest_name: String, winner: String, loser: String) : RaireA
     prior to 'loser'.
     */
 
-    fun is_vote_for_winner(cvr: CVR): Int {
-        if (!this.contest_name in cvr) return 0
+    override fun is_vote_for_winner(cvr: CVR): Int {
+        if (!cvr.has_contest(this.contest_name)) return 0
 
-        return if (ranking(this.winner, cvr[this.contest]) == 0) 1 else 0
+        return if (ranking(this.winner, cvr.votes[this.contest_name]!!) == 0) 1 else 0
     }
 
-    fun is_vote_for_loser(cvr: CVR): Int {
-        if (!this.contest_name in cvr) return 0
+    override fun is_vote_for_loser(cvr: CVR): Int {
+        if (!cvr.has_contest(this.contest_name)) return 0
 
-        w_idx = ranking(this.winner, cvr[this.contest_name])
-        l_idx = ranking(this.loser, cvr[this.contest_name])
+        val w_idx = ranking(this.winner, cvr.votes[this.contest_name]!!)
+        val l_idx = ranking(this.loser, cvr.votes[this.contest_name]!!)
 
-        return 1 if l_idx != -1 and (w_idx == -1 or (w_idx != -1 and
-                l_idx < w_idx)) else 0
+        // return 1 if l_idx != -1 and (w_idx == -1 or (w_idx != -1 and l_idx < w_idx)) else 0
+        return if (l_idx != -1 && (w_idx == -1 || (w_idx != -1 && l_idx < w_idx))) 1 else 0
     }
 
-        override fun same_as(other: RaireAssertion): Boolean {
-                return this.contest_name == other.contest_name && this.winner == other.winner
-                        && this.loser == other.loser
+    override fun same_as(other: RaireAssertion): Boolean {
+        return this.contest_name == other.contest_name && this.winner == other.winner
+                && this.loser == other.loser
     }
 
-    fun subsumes(other: RaireAssertion): Boolean {
+    override fun subsumes(other: RaireAssertion): Boolean {
         /*
         An NEBAssertion 'A' subsumes an assertion 'other' if:
         - 'other' is not an NEBAssertion
@@ -386,57 +395,80 @@ class NEBAssertion(contest_name: String, winner: String, loser: String) : RaireA
         winner of this NEBAssertion assertion appears before the loser in
         'Tail' or the loser appears and the winner does not.
         */
+
+        //         if type(other) == NEBAssertion:
+        //            return False
+        //
+        //        if self.winner == other.winner and self.loser == other.loser:
+        //            return True
+        //
+        //        if self.winner == other.winner and not(self.loser in \
+        //            other.eliminated):
+        //            return True
+        //
+        //        elif self.winner in other.eliminated and not(self.loser in \
+        //            other.eliminated):
+        //            return True
+        //
+        //        else:
+        //            # For all outcomes that 'other' is ruling out, this NEB
+        //            # rules them all out.
+        //            for ro in other.rules_out:
+        //                idxw = -1 if not self.winner in ro else ro.index(self.winner)
+        //                idxl = -1 if not self.loser in ro else ro.index(self.loser)
+        //
+        //                if idxw == idxl or (idxl < idxw):
+        //                    return False
+        //
+        //            return True
+        //
+        //        return False
+
         if (other is NEBAssertion) return false
 
-        if this.winner == other.winner and this.loser == other.loser:
-        return true 
+        if (this.winner == other.winner && this.loser == other.loser) return true
 
-        if this.winner == other.winner and not(
-            this.loser in
-                    other.eliminated
-        ):
-        return true 
+        /* TODO
+        if (this.winner == other.winner && !(this.loser in other.eliminated)) {
+            return true
 
-        elif self . winner in other . eliminated and not (this.loser in
-                other.eliminated):
-        return true 
+        } else if (this.winner in other.eliminated && !(this.loser in other.eliminated)) {
+            return true
 
-        else:
-//  For all outcomes that 'other' is ruling out, this NEB
-//  rules them all out.
-        for ro in other.rules_out:
-        idxw = -1 if not self . winner in ro else ro . index (this.winner)
-        idxl = -1 if not self . loser in ro else ro . index (this.loser)
+        } else {
+            //  For all outcomes that 'other' is ruling out, this NEB rules them all out.
+            for (ro in other.rules_out) {
+                val idxw: Int = if (ro.contains(this.winner)) -1 else ro.indexOf(this.winner)
+                val idxl: Int = if (ro.contains(this.loser)) -1 else ro.indexOf(this.loser)
 
-        if idxw == idxl or (idxl < idxw):
-        return false 
-
-        return true 
-
-        return false 
+                if (idxw == idxl || (idxl < idxw)) {
+                    return false
+                }
+            }
+            return true
+        } */
+        return false
     }
 
-    fun to_str() {
-        return "NEB,Winner,{},Loser,{},diff est {}".format(
-            this.winner,
-            this.loser, this.difficulty
-        )
+    override fun to_str(): String {
+        return "NEB Winner ${this.winner},Loser ${this.loser},diff est ${this.difficulty}"
     }
 }
 
 // Returns true if listb = some_list + lista
-fun is_suffix(lista, listb) {
-    len_lista = len(lista)
-    len_listb = len(listb)
-    
-    if len_listb < len_lista:
-    return false 
-    
-    return listb[len_listb-len_lista:] == lista
+fun is_suffix(lista: List<Any>, listb: List<Any>): Boolean {
+    val len_lista = lista.size
+    val len_listb = listb.size
+
+    if (len_listb < len_lista) return false
+
+    val ss = listb.subList(len_listb - len_lista, listb.size)
+    return ss == lista
 }
 
 
-class NENAssertion(contest_name: String, winner: String, loser: String, val eliminated: List<String>) : RaireAssertion(contest_name, winner, loser) {
+class NENAssertion(contest_name: String, winner: String, loser: String, val eliminated: List<String>) :
+    RaireAssertion(contest_name, winner, loser) {
     /*
     A Not-Eliminated-Next (NEN) assertion between a candidate 'winner' and
     a candidate 'loser' compares the tally of the two candidates in the
@@ -453,70 +485,83 @@ class NENAssertion(contest_name: String, winner: String, loser: String, val elim
     of 'loser'.
     */
 
-    fun is_vote_for_winner(cvr: CVR): Int {
-        if not self . contest in cvr :
-        return 0
-
-        return vote_for_cand(this.winner, this.eliminated, cvr[this.contest])
+    override fun is_vote_for_winner(cvr: CVR): Int {
+        if (!cvr.has_contest(this.contest_name)) return 0
+        return vote_for_cand(this.winner, this.eliminated, cvr.votes[this.contest_name]!!)
     }
 
-    fun is_vote_for_loser(cvr: CVR): Int {
-        if not self . contest in cvr :
-        return 0
-
-        return vote_for_cand(this.loser, this.eliminated, cvr[this.contest])
+    override fun is_vote_for_loser(cvr: CVR): Int {
+        if (!cvr.has_contest(this.contest_name)) return 0
+        return vote_for_cand(this.loser, this.eliminated, cvr.votes[this.contest_name]!!)
     }
 
-    fun same_as(other: RaireAssertion): Boolean {
-        return this.contest == other.contest
-        and self . winner == other . winner
-                and self . loser == other . loser
-                and self . eliminated == other . eliminated
+    override fun same_as(other: RaireAssertion): Boolean {
+        if (other !is NENAssertion) return false
+        return this.contest_name == other.contest_name
+                && this.winner == other.winner
+                && this.loser == other.loser
+                && this.eliminated == other.eliminated
     }
 
-    fun subsumes(other: RaireAssertion): Boolean {
+    override fun subsumes(other: RaireAssertion): Boolean {
         /*
         An NENAssertion 'A' subsumes an assertion 'other' if 'other' is
         not an NEBAssertion, the outcomes that 'A' rules out are suffixes of
         the outcomes that 'B' rules out.
         */
 
-        if type(other) == NEBAssertion:
-        return false
+        //         if type(other) == NEBAssertion:
+        //            return False
+        //
+        //        other_ro = set(other.rules_out)
+        //
+        //        for ro in self.rules_out:
+        //            other_ro = [o for o in other_ro if not(is_suffix(ro, o))]
+        //
+        //        return other_ro == []
 
-        other_ro = set(other.rules_out)
+        if (other !is NENAssertion) return false
 
-        for ro in this.rules_out:
-        other_ro = [o for o in other_ro if not(is_suffix(ro, o))]
+        // TODO not sure whats correct
+        val other_ro = mutableListOf(other.rules_out)
 
-        return other_ro == []
+        /* TODO
+        // for ro in this.rules_out: other_ro = [o for o in other_ro if not(is_suffix(ro, o))]
+        this.rules_out.forEach { ro ->
+            other_ro.forEach { oro ->
+                if (!is_suffix(ro, oro)) other_ro.add(oro)
+            }
+        }
+
+         */
+
+        return other_ro.isEmpty()
     }
 
+/*
+    override fun to_str() = buildString {
+        append( "NEN Winner= ${winner} Loser= ${loser} Eliminated= ")
 
-    fun to_str(): String {
-        result = "NEN,Winner,{},Loser,{},Eliminated".format(
-            this.winner,
-            this.loser
-        )
-
-        for cand in this.eliminated:
+        for (cand in this.eliminated:
         result += ",{}".format(cand)
 
         result += ",diff est {}, rules out: {}".format(this.difficulty, \
         this.rules_out)
         return result
     }
+
+ */
 }
 
 
-class RaireNode(val tail : List<String>) {
+class RaireNode(val tail: List<String>) {
     //  Tail of an "imagined" elimination sequence representing the
     //  outcome of an IRV election. The last candidate in the tail is
     //  the "imagined" winner of the election.
 
     //  Lowest cost assertion that, if true, can rule out any election
     //  outcome that *ends* with the given tail.
-    var best_assertion: NEBAssertion? = null
+    var best_assertion: RaireAssertion? = null
 
     //  An "ancestor" of this node is a node whose tail equals the latter
     //  part of val tail (i.e., if this.tail is ["A", "B", "C"], the node
@@ -653,11 +698,13 @@ class RaireFrontier {
     }
 }
 
-fun find_best_audit(contest: Contest,
-                    ballots: List<Map<String, Int>>,
-                    neb_matrix: Map<String, MutableMap<String, NEBAssertion?>>,
-                    node: RaireNode,
-                    asn_func: EstimatorFn) {
+fun find_best_audit(
+    contest: Contest,
+    ballots: List<Map<String, Int>>,
+    neb_matrix: Map<String, MutableMap<String, NEBAssertion?>>,
+    node: RaireNode,
+    asn_func: EstimatorFn
+) {
     /*
     Input:
     node: RaireNode    -  A node in the tree of alternate election outcomes.
@@ -687,7 +734,7 @@ fun find_best_audit(contest: Contest,
     val ntail = node.tail.size
     val first_in_tail = node.tail[0]
 
-    var best_asrtn: NEBAssertion? = null
+    var best_asrtn: RaireAssertion? = null
 
     //  We first consider if we can invalidate this outcome by showing that
     //  'first_in_tail' can not-be-eliminated-before a candidate that
@@ -708,9 +755,10 @@ fun find_best_audit(contest: Contest,
     //  point in the elimination sequence), that can not-be-eliminated-before
     //  'first_in_tail'.
     for (cand in eliminated) {
-    for (cand_in_tail in node.tail) {
-        val neb = neb_matrix[cand]!![cand_in_tail]
-        if (neb != null && (best_asrtn == null || neb.difficulty < best_asrtn.difficulty)) best_asrtn = neb
+        for (cand_in_tail in node.tail) {
+            val neb = neb_matrix[cand]!![cand_in_tail]
+            if (neb != null && (best_asrtn == null || neb.difficulty < best_asrtn.difficulty)) best_asrtn = neb
+        }
     }
 
     //  We now consider whether we can find a better NEN assertion. We
@@ -740,7 +788,10 @@ fun find_best_audit(contest: Contest,
             if (best_asrtn == null || estimate < best_asrtn.difficulty) {
                 val nen = NENAssertion(contest.name, first_in_tail, later_cand, eliminated)
 
-                nen.rules_out.addAll(node.tail)
+                // AFAICT, this is the only place that rules_out is added to?
+                // rules_out has assewrtions, node.tail has Strings
+                // nen.rules_out.add(tuple(node.tail))
+                // nen.rules_out.addAll(node.tail) TODO
                 nen.difficulty = estimate
 
                 nen.votes_for_winner = tally_first_in_tail
@@ -758,8 +809,9 @@ fun find_best_audit(contest: Contest,
     }
 }
 
+data class ManageNodeReturn(val audit_not_possible: Boolean, val lowerBound: Double, val terminus: Boolean)
 
-fun manage_node(newn, frontier, lowerbound, log, stream=sys.stdout) {
+fun manage_node(newn: RaireNode, frontier: RaireFrontier, lowerbound: Double, log: Boolean): ManageNodeReturn {
 
     /*
 Input:
@@ -801,41 +853,72 @@ false  otherwise.
 
 */
 
-    if not newn . expandable :
-//  'newn' is a leaf.
-    if newn.estimate == np.inf and newn.best_ancestor.estimate == np.inf:
+    //     if not newn.expandable:
+    //        # 'newn' is a leaf.
+    //        if newn.estimate == np.inf and newn.best_ancestor.estimate == np.inf:
+    //
+    //            if log:
+    //                print("Found branch that cannot be pruned.", file=stream)
+    //
+    //            return True, np.inf, True
+    //
+    //        if newn.best_ancestor.estimate <= newn.estimate:
+    //            next_lowerbound = max(lowerbound, newn.best_ancestor.estimate)
+    //            frontier.replace_descendents(newn.best_ancestor,log,stream=stream)
+    //
+    //            return False, next_lowerbound, True
+    //
+    //        else:
+    //            next_lowerbound = max(lowerbound, newn.estimate)
+    //            frontier.insert_node(newn)
+    //
+    //            if log:
+    //                print("    Best audit ", file=stream, end='')
+    //                newn.best_assertion.display(stream=stream)
+    //
+    //            return False, next_lowerbound, True
+    //    else:
+    //        frontier.insert_node(newn)
+    //
+    //        if log:
+    //            if newn.best_assertion != None:
+    //                print("    Best audit ", file=stream, end='')
+    //                newn.best_assertion.display(stream=stream)
+    //            else:
+    //                print("    Cannot be disproved", file=stream)
+    //
+    //        return False, lowerbound, False
 
-    if log:
-    print("Found branch that cannot be pruned.", file = stream)
+    if (!newn.expandable) {
+        //  'newn' is a leaf.
+        if (newn.estimate == Double.POSITIVE_INFINITY && newn.best_ancestor!!.estimate == Double.POSITIVE_INFINITY) {
+            if (log) println("Found branch that cannot be pruned.")
+            return ManageNodeReturn(true, Double.POSITIVE_INFINITY, true)
+        }
 
-    return true , np.inf, true
+        if (newn.best_ancestor!!.estimate <= newn.estimate) {
+            val next_lowerbound = max(lowerbound, newn.best_ancestor!!.estimate)
+            frontier.replace_descendents(newn.best_ancestor!!, log)
+            return ManageNodeReturn(false, next_lowerbound, true)
+        } else {
+            val next_lowerbound = max(lowerbound, newn.estimate)
+            frontier.insert_node(newn)
+            if (log) {
+                print("    Best audit ")
+                //newn.best_assertion.display(stream = stream)
+            }
+            return ManageNodeReturn(false, next_lowerbound, true)
+        }
 
-    if newn.best_ancestor.estimate <= newn.estimate:
-    next_lowerbound = max(lowerbound, newn.best_ancestor.estimate)
-    frontier.replace_descendents(newn.best_ancestor, log, stream = stream)
+    } else {
+        frontier.insert_node(newn)
 
-    return false , next_lowerbound, true
+        if (log) {
+            if (newn.best_assertion != null) println("    Best audit ") else println("    Cannot be disproved")
+        }
 
-    else:
-    next_lowerbound = max(lowerbound, newn.estimate)
-    frontier.insert_node(newn)
-
-    if log:
-    print("    Best audit ", file = stream, end = '')
-    newn.best_assertion.display(stream = stream)
-
-    return false , next_lowerbound, true
-    else:
-    frontier.insert_node(newn)
-
-    if log:
-    if newn.best_assertion != null :
-    print("    Best audit ", file = stream, end = '')
-    newn.best_assertion.display(stream = stream)
-    else:
-    print("    Cannot be disproved", file = stream)
-
-    return false , lowerbound, false
+        return ManageNodeReturn(false, lowerbound, false)
+    }
 }
 
 fun perform_dive(
@@ -846,42 +929,43 @@ fun perform_dive(
     asn_func: EstimatorFn,
     lower_bound: Double,
     frontier: RaireFrontier,
-    log: Boolean) {
+    log: Boolean
+): Double {
 
-/*
-Input:
-node: RaireNode    -  A node in the tree of alternate election outcomes.
-Starting point of dive to a leaf.
+    /*
+    Input:
+    node: RaireNode    -  A node in the tree of alternate election outcomes.
+    Starting point of dive to a leaf.
 
-contest: Contest   -  Contest being audited.
+    contest: Contest   -  Contest being audited.
 
-ballots:           -  Details of reported ballots for this contest.
+    ballots:           -  Details of reported ballots for this contest.
 
-neb_matrix         -  |Candidates| x |Candidates| dictionary where
-neb_matrix[c1][c2] returns a NEBAssertion stating
-that c1 cannot be eliminated before c2 (if one
-exists) and null  otherwise.
+    neb_matrix         -  |Candidates| x |Candidates| dictionary where
+    neb_matrix[c1][c2] returns a NEBAssertion stating
+    that c1 cannot be eliminated before c2 (if one
+    exists) and null  otherwise.
 
-asn_func: Callable -  Function that takes an assertion margin and
-returns an estimate of how "difficult" it will
-be to audit that assertion.
+    asn_func: Callable -  Function that takes an assertion margin and
+    returns an estimate of how "difficult" it will
+    be to audit that assertion.
 
-lower_bound        -  Current lower bound on audit difficulty.
+    lower_bound        -  Current lower bound on audit difficulty.
 
-frontier           -  Current frontier of our set of alternate outcome
-trees.
+    frontier           -  Current frontier of our set of alternate outcome
+    trees.
 
-log                -  Flag indicating if logging statements should
-be printed during the algorithm.
+    log                -  Flag indicating if logging statements should
+    be printed during the algorithm.
 
 
-Output:
-Returns the difficulty estimate of the least-difficult-to-audit
-assertion that can be used to rule out at least one of the branches
-starting at the input 'node'. As this function dives from the given 'node'
-it will add nodes to the current frontier of our set of alternate outcome
-trees.
-*/
+    Output:
+    Returns the difficulty estimate of the least-difficult-to-audit
+    assertion that can be used to rule out at least one of the branches
+    starting at the input 'node'. As this function dives from the given 'node'
+    it will add nodes to the current frontier of our set of alternate outcome
+    trees.
+    */
 
 //    ncands = len(contest.candidates)
 //
@@ -928,51 +1012,55 @@ trees.
 //
 //    return perform_dive(newn, contest, ballots, neb_matrix, asn_func, \
 //            next_lowerbound, frontier, log, stream=stream)
-val ncands = contest.candidates.size
+    val ncands = contest.candidates.size
 
-val rem_cands = [c for c in contest.candidates if not c in node.tail]
+    // rem_cands = [c for c in contest.candidates if not c in node.tail]
+    val rem_cands = contest.candidates.filter { !node.tail.contains(it) }
 
-//  sort rem_cands by position in contest.order if it is defined
-val next_cand = rem_cands[0]
-if contest.outcome != []:
-npos = contest.outcome.index(next_cand)
+    //  sort rem_cands by position in contest.order if it is defined
+    var next_cand = rem_cands[0] // TODO empty ?
+    /* if (contest.outcome.isNotEmpty()) {
+        var npos = contest.outcome.index(next_cand)
 
-for (i in range(1, len(rem_cands))) {
-    val c = rem_cands[i]
-    ipos = contest.outcome.index(c)
+        for (i in 1..rem_cands.size) { // TODO check
+            val c = rem_cands[i]
+            val ipos = contest.outcome.indexOf(c)
 
-    if ipos > npos:
-    next_cand = c
-    npos = ipos
-}
+            if (ipos > npos) {
+                next_cand = c
+                npos = ipos
+            }
+        }
+    } */ // TODO
 
-val newn = RaireNode([next_cand] + node.tail)
-newn.expandable = (newn.tail.size != ncands)
-newn.dive_node = true
+    val newn = RaireNode(listOf(next_cand) + node.tail)
+    newn.expandable = (newn.tail.size != ncands)
+    newn.dive_node = true
 
-node.explored.add(next_cand)
+    node.explored.add(next_cand)
 
-//  Assign a 'best ancestor' to the new node.
-newn.best_ancestor = if (node.best_ancestor != null &&
-    node.best_ancestor.estimate <= node.estimate) node.best_ancestor else node
+    //  Assign a 'best ancestor' to the new node.
+    newn.best_ancestor = if (node.best_ancestor != null && node.best_ancestor!!.estimate <= node.estimate) node.best_ancestor else node
 
-find_best_audit(contest, ballots, neb_matrix, newn, asn_func)
+    find_best_audit(contest, ballots, neb_matrix, newn, asn_func)
 
-if log:
-print("DIVE TESTED ", file = stream, end = '')
-newn.display(stream = stream)
+    if (log) {
+        println("DIVE TESTED ")
+        //newn.display(stream = stream)
+    }
 
-audit_not_possible, next_lowerbound, dive_complete = manage_node(newn,
-frontier, lower_bound, log, stream = stream)
+    val (audit_not_possible, next_lowerbound, dive_complete) = manage_node(newn, frontier, lower_bound, log)
 
-if audit_not_possible:
-return np.inf
+    if (audit_not_possible) {
+        return Double.POSITIVE_INFINITY
+    }
 
-if dive_complete:
-return next_lowerbound
+    if (dive_complete) {
+        return next_lowerbound
+    }
 
-return perform_dive(
-    newn, contest, ballots, neb_matrix, asn_func,
-    next_lowerbound, frontier, log, stream = stream
-)
+    return perform_dive(
+        newn, contest, ballots, neb_matrix, asn_func,
+        next_lowerbound, frontier, log,
+    )
 }
