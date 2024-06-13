@@ -105,6 +105,7 @@ class Assertion(
                 (2 - this.margin!! / this.assorter.upper_bound)
     }
 
+    /*
     fun set_margin_from_cvrs(audit: Audit, cvr_list: List<CVR>) {
         /*
         find assorter margin from cvrs and store it
@@ -151,6 +152,7 @@ class Assertion(
             throw NotImplementedError("audit type {this.contest.audit_type} not supported")
         }
     }
+     */
 
     fun find_margin_from_tally(tallyInput: Map<String, Int>? = null) {
         /*
@@ -580,8 +582,8 @@ class Assertion(
                 for (losr in loser) {
                     val wl_pair = winr + " v " + losr
                     val _test = NonnegMean(
-                        testFn = test, estimFn = estim, betFn = bet, /* g = contest.g, */ u = 1.0, N = contest.cards,
-                        t = .5, random_order = true)
+                        u = 1.0, N = contest.cards, t = .5,
+                        testFnOverride = test, estimFnOverride = estim, betFnOverride = bet, gOverride = contest.g)
 
                     assertions[wl_pair] = Assertion(
                         contest,
@@ -658,8 +660,8 @@ class Assertion(
             cands.add(winner)
 
             val _test = NonnegMean(
-                testFn = test, estimFn = estim, betFn = bet, u = 1 / (2 * contest.share_to_win),
-                N = contest.cards, t = 0.5, random_order = true
+                u = 1 / (2 * contest.share_to_win), N = contest.cards, t = 0.5,
+                testFnOverride = test, estimFnOverride = estim, betFnOverride = bet,
             )
             assertions[wl_pair] = Assertion(
                 contest, winner = winner, loser = Candidates.ALL_OTHERS.name,
