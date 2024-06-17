@@ -39,9 +39,9 @@ class Audit(
 
     fun find_sample_size(
         contests: Map<String, Contest>,
-        cvrs: List<CVR>?,
-        mvr_sample: List<CVR>,
-        cvr_sample: List<CVR>
+        cvrs: List<Cvr>?,
+        mvr_sample: List<Cvr>,
+        cvr_sample: List<Cvr>
     ): Int {
         /*
         Estimate sample size for each contest && overall to allow the audit to complete.
@@ -167,18 +167,18 @@ class Audit(
                     cvr.p = 0.0
                     for ((c, con) in contests) {
                         if (cvr.has_contest(c) && !cvr.sampled) {
-                            val p1 = con.sample_size / (con.cards - old_sizes[c]!!)
-                            cvr.p = max(p1.toDouble(), cvr.p) // TODO nullability
+                            val p1 = con.sample_size!! / (con.ncards - old_sizes[c]!!)
+                            cvr.p = max(p1.toDouble(), cvr.p!!) // TODO nullability
                         }
                     }
                 }
             }
             // total_size = ceil(np.sum([x.p for x in cvrs if !x.phantom))
-            val summ: Double = cvrs.filter { !it.phantom }.map { it.p }.sum()
+            val summ: Double = cvrs.filter { !it.phantom }.map { it.p!! }.sum()
             total_size = ceil(summ).toInt()
         } else {
             // total_size = np.max(np.array([con.sample_size for con in contests.values()]))
-            total_size = contests.values.map { it.sample_size }.max()
+            total_size = contests.values.map { it.sample_size!! }.max()
         }
         return total_size
     }

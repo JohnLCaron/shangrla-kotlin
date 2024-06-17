@@ -1,6 +1,6 @@
 package org.cryptobiotic.shangrla.raire
 
-import org.cryptobiotic.shangrla.core.CVR
+import org.cryptobiotic.shangrla.core.Cvr
 import kotlin.math.max
 
 
@@ -264,7 +264,7 @@ open class RaireAssertion(val contest_name: String, val winner: String, val lose
 
     val rules_out = mutableSetOf<RaireAssertion>()
 
-    open fun is_vote_for_winner(cvr: CVR): Int {
+    open fun is_vote_for_winner(cvr: Cvr): Int {
         /*
         Input:
             cvr - cast vote record
@@ -276,7 +276,7 @@ open class RaireAssertion(val contest_name: String, val winner: String, val lose
         return 0 // TODO
     }
 
-    open fun is_vote_for_loser(cvr: CVR): Int {
+    open fun is_vote_for_loser(cvr: Cvr): Int {
         /*
         Input:
             cvr - cast vote record
@@ -365,13 +365,13 @@ class NEBAssertion(contest_name: String, winner: String, loser: String) : RaireA
     prior to 'loser'.
     */
 
-    override fun is_vote_for_winner(cvr: CVR): Int {
+    override fun is_vote_for_winner(cvr: Cvr): Int {
         if (!cvr.has_contest(this.contest_name)) return 0
 
         return if (ranking(this.winner, cvr.votes[this.contest_name]!!) == 0) 1 else 0
     }
 
-    override fun is_vote_for_loser(cvr: CVR): Int {
+    override fun is_vote_for_loser(cvr: Cvr): Int {
         if (!cvr.has_contest(this.contest_name)) return 0
 
         val w_idx = ranking(this.winner, cvr.votes[this.contest_name]!!)
@@ -485,12 +485,12 @@ class NENAssertion(contest_name: String, winner: String, loser: String, val elim
     of 'loser'.
     */
 
-    override fun is_vote_for_winner(cvr: CVR): Int {
+    override fun is_vote_for_winner(cvr: Cvr): Int {
         if (!cvr.has_contest(this.contest_name)) return 0
         return vote_for_cand(this.winner, this.eliminated, cvr.votes[this.contest_name]!!)
     }
 
-    override fun is_vote_for_loser(cvr: CVR): Int {
+    override fun is_vote_for_loser(cvr: Cvr): Int {
         if (!cvr.has_contest(this.contest_name)) return 0
         return vote_for_cand(this.loser, this.eliminated, cvr.votes[this.contest_name]!!)
     }

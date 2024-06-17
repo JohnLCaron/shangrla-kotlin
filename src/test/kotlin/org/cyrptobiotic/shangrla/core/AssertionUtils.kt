@@ -1,6 +1,6 @@
-package org.cyrptobiotic.shangrla
+package org.cyrptobiotic.shangrla.core
 
-import org.cryptobiotic.shangrla.core.CVR
+import org.cryptobiotic.shangrla.core.Cvr
 import org.cryptobiotic.shangrla.core.Contest
 import org.cryptobiotic.shangrla.core.SocialChoiceFunction
 import kotlin.math.max
@@ -11,18 +11,18 @@ class AssertionUtils {
     companion object {
         fun find_sample_size(contests: List<Contest>, sample_size_function: (Double, Double) -> Int): Int {
             /*
-        Find initial sample size : maximum across assertions for all contests .
+            Find initial sample size : maximum across assertions for all contests .
 
-        Parameters:
-        -----------
-        contests : dict of dicts
-        assertion : dict of dicts
-        sample_size_function : callable; takes two parameters, the margin and the risk limit; returns a sample size
+            Parameters:
+            -----------
+            contests : dict of dicts
+            assertion : dict of dicts
+            sample_size_function : callable; takes two parameters, the margin and the risk limit; returns a sample size
 
-                Returns:
-        --------
-        size : int; sample size expected to be adequate to confirm all assertions
-        */
+                    Returns:
+            --------
+            size : int; sample size expected to be adequate to confirm all assertions
+            */
 
             var sample_size = 0
             for (c in contests) {
@@ -82,7 +82,7 @@ class AssertionUtils {
             }
         }
 
-        fun find_margins(contests: List<Contest>, cvr_list : List<CVR>, use_style : Boolean): Double {
+        fun find_margins(contests: List<Contest>, cvr_list : List<Cvr>, use_style : Boolean): Double {
             /*
             Find all the assorter margins in a set of Assertions. Updates the dict of dicts of assertions,
             and the contest dict.

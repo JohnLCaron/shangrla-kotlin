@@ -548,36 +548,35 @@ class NonnegMean (
         return sam_size
     }
 
-    fun optimal_comparison(x: DoubleArray): Double {
+    fun optimal_comparison(p2p: Double): Double {
             /*
-        The value of eta corresponding to the "bet" that is optimal for ballot-level comparison audits,
-        for which overstatement assorters take a small number of possible values and are concentrated
-        on a single value when the CVRs have no errors.
+            The value of eta corresponding to the "bet" that is optimal for ballot-level comparison audits,
+            for which overstatement assorters take a small number of possible values and are concentrated
+            on a single value when the CVRs have no errors.
 
-        Let p0 be the rate of error-free CVRs, p1=0 the rate of 1-vote overstatements,
-        and p2= 1-p0-p1 = 1-p0 the rate of 2-vote overstatements. Then
+            Let p0 be the rate of error-free CVRs, p1=0 the rate of 1-vote overstatements,
+            and p2= 1-p0-p1 = 1-p0 the rate of 2-vote overstatements. Then
 
-        eta = (1-u*p0)/(2-2*u) + u*p0 - 1/2, where p0 is the rate of error-free CVRs.
+            eta = (1-u*p0)/(2-2*u) + u*p0 - 1/2, where p0 is the rate of error-free CVRs.
 
-        Translating to p2=1-p0 gives:
+            Translating to p2=1-p0 gives:
 
-        eta = (1-u*(1-p2))/(2-2*u) + u*(1-p2) - 1/2.
+            eta = (1-u*(1-p2))/(2-2*u) + u*(1-p2) - 1/2.
 
-        Parameters
-        ----------
-        x: np.array
-            input data
-        rate_error_2: float
-            hypothesized rate of two-vote overstatements
+            Parameters
+            ----------
+            x: np.array
+                input data
+            rate_error_2: float
+                hypothesized rate of two-vote overstatements
 
-        Returns
-        -------
-        eta: float
-            estimated alternative mean to use in alpha
-        */
-            // set the parameters
+            Returns
+            -------
+            eta: float
+                estimated alternative mean to use in alpha
+            */
             // TO DO: double check where rate_error_2 is set
-            val p2: Double = 1e-4 // getattr(self, "rate_error_2", 1e-4)  // rate of 2-vote overstatement errors
+            val p2 = p2p ?: 1e-4 // getattr(self, "rate_error_2", 1e-4)  // rate of 2-vote overstatement errors
             return (1 - this.u * (1 - p2)) / (2 - 2 * this.u) + this.u * (1 - p2) - 1 / 2
         }
 

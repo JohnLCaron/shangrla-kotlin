@@ -1,7 +1,7 @@
 package org.cryptobiotic.shangrla.raire
 
 import org.cryptobiotic.shangrla.core.Assertion
-import org.cryptobiotic.shangrla.core.CVR
+import org.cryptobiotic.shangrla.core.Cvr
 import kotlin.math.max
 
 // import org.cryptobiotic.shangrla.core.Contest
@@ -10,7 +10,7 @@ typealias EstimatorFn = (winner: Int, loser: Int, other: Int, total: Int) -> Dou
 
 fun compute_raire_assertions(
     contest: Contest,
-    cvrs: List<CVR>,
+    cvrs: List<Cvr>,
     winner: String,
     asn_func: EstimatorFn,
     log: Boolean,

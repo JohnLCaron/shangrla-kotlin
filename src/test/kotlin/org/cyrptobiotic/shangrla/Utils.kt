@@ -1,7 +1,5 @@
 package org.cyrptobiotic.shangrla
 
-import org.cryptobiotic.shangrla.core.CVR
-
 /*
 fun from_vote(vote: String, id: String, contest_id: String, phantom: Boolean = false): CVR {
     /*
