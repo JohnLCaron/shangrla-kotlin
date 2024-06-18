@@ -56,6 +56,14 @@ class NonnegMean (
     val lam = lamOverride ?: 0.5 // initial fraction of fortune to bet TODO allow to be set
     val eta = etaOverride ?: (t + (u - t) / 2)
 
+    fun copy(uOverride: Double) = NonnegMean(
+        u = uOverride,
+        N = this.N,
+        t = this.t,
+        random_order = this.random_order,
+        gOverride = this.gOverride,
+        withReplacement = this.withReplacement,
+    )
 
     init {
         //         """
@@ -412,6 +420,53 @@ class NonnegMean (
         return DoubleArray(x.size) { this.lam }
     }
 
+    fun kaplan_markov(x: DoubleArray, g: Double = 0.0, random_order: Boolean = true): Pair<Double, DoubleArray> {
+        /*
+        Kaplan-Markov p-value for the hypothesis that the sample x is drawn IID from a population
+        with mean t against the alternative that the mean is less than t.
+
+        If there is a possibility that x has elements equal to zero, set g>0; otherwise, the p-value
+        will be 1.
+
+        If the order of the values in the sample is random, you can set random_order = True to use
+        optional stopping to increase the power. If the values are not in random order or if you want
+        to use all the data, set random_order = False
+
+        Parameters:
+        -----------
+        x: the sample
+        attributes used:
+            g: float "padding" so that if there are any zeros in the sample, the martingale doesn't vanish forever
+            random_order: Boolean if the sample is in random order, it is legitimate to stop early, which can yield a
+                more powerful test. See above.
+
+        Returns:
+        --------
+        p: the p-value
+        p_history: sample by sample history of p-values. Not meaningful unless the sample is in random order.
+        */
+        //         t = self.t
+        //        g = getattr(self, "g", 0)
+        //        random_order = getattr(self, "random_order", True)
+        //        if negs := sum(xx < 0 for xx in x) > 0: # TODO should be count ??
+        //            raise ValueError(
+        //                "{negs} negative values in sample from a nonnegative population."
+        //            )
+        //        p_history = np.cumprod((t + g) / (x + g))
+        //        return np.min( [1, np.min(p_history) if random_order else p_history[-1]] ), np.minimum(p_history, 1)
+
+        if (x.any { it < 0.0 })
+            throw Exception("negative values in sample from a nonnegative population.")
+
+        val xcalc = DoubleArray(x.size) { (t + g) / (x[it] + g) }
+        val p_history = numpy_cumprod(xcalc)
+        val pValue = if (random_order) min(1.0, p_history.min()) else p_history.last()
+        //      return np.min( [1, np.min(p_history) if random_order else p_history[-1]] ),
+        //             np.minimum(p_history, 1)
+        val sampleHistory = DoubleArray(p_history.size) { it -> min(p_history[it], 1.0) }
+        return Pair(pValue, sampleHistory)
+    }
+
     fun kaplan_wald(x: DoubleArray): Pair<Double, DoubleArray> {
         /*
         Kaplan-Wald p-value for the hypothesis that the sample x is drawn IID from a population
@@ -540,8 +595,9 @@ class NonnegMean (
                 val choices = python_choice(x, size = ran_len)
                 val pop = numpy_append(pfx, choices) // tile data to make the population
                 val (p, p_history) = this.test(pop)
-                val crossed = p_history.filter{ it <= alpha }
-                sams[it] = if (crossed.sum() == 0.0) N else (numpy_argmax(crossed) + 1)
+                val crossed = p_history.map{ it <= alpha }
+                val crossedCount = crossed.filter { it }.count()
+                sams[it] = if (crossedCount == 0) N else (indexFirstTrue(crossed) + 1)
             }
             numpy_quantile(sams, quantile)
         }
@@ -716,6 +772,11 @@ fun numpy_argmax(a: List<Double>) : Int {
     return maxIdx
 }
 
+// Returns the first index thats true. Dont know why
+fun indexFirstTrue(a: List<Boolean>) : Int {
+    return a.indexOfFirst { it }
+}
+
 fun numpy_append(pfx: DoubleArray, a: DoubleArray) : DoubleArray {
     val n = pfx.size
     return DoubleArray(pfx.size + a.size) { if (it<n) pfx[it] else a[it-n] }
@@ -730,7 +791,7 @@ fun numpy_append(pfx: DoubleArray, a: DoubleArray) : DoubleArray {
 //    result: the result corresponds to the quantiles.
 
 fun numpy_quantile(a: IntArray, q: Double): Int {
-    return 0 // TODO
+    return a.average().toInt() // TODO
 }
 
 //     def choice(self, a, size=None, replace=True, p=None): # real signature unknown; restored from __doc__

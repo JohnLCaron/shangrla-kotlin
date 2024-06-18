@@ -1,6 +1,7 @@
 package org.cyrptobiotic.shangrla.core
 
 import org.cryptobiotic.shangrla.core.Cvr
+import kotlin.random.Random
 
 class CvrBuilders {
     val builders = mutableListOf<CvrBuilder>()
@@ -21,6 +22,11 @@ class CvrBuilders {
             cb.addContestVotes(it)
         }
         builders.add(cb)
+        return this
+    }
+
+    fun addBuilder(builder: CvrBuilder): CvrBuilders {
+        builders.add(builder)
         return this
     }
 
@@ -84,8 +90,9 @@ class CvrBuilder(
     val contests = mutableMapOf<String, MutableMap<String, Int>>() // Map(contestId, Map(candidate, vote))
     var tally_pool: String? = null
 
-    fun addContest(contestId: String) {
+    fun addContest(contestId: String): CvrBuilder {
         contests.getOrPut(contestId) { mutableMapOf() }
+        return this
     }
 
     fun addContestVotes(cv: ContestVotes) {
@@ -96,10 +103,11 @@ class CvrBuilder(
         }
     }
 
-    fun addVote(contestName: String, candidateName: String) {
+    fun addVote(contestName: String, candidateName: String): CvrBuilder {
         val contest = contests.getOrPut(contestName) { mutableMapOf() }
         val vote: Int = contest.getOrPut(candidateName) { 0 }
         contest[candidateName] = vote + 1
+        return this
     }
 
     // ContestId -> (Candidate, vote)
@@ -158,14 +166,11 @@ class CvrBuilder(
     }
 }
 
-/*
-fun makeCvrBuilderWithVotes(cvrId: String, phantom: Boolean, vararg votes: Vote): CvrBuilder {
-    val builder =  CvrBuilder(cvrId, phantom)
-    votes.forEach { builder.addVote( it ) }
-    return builder
+fun cvrFromVote(candidateId: String, cvrId: String = "crv${Random.nextInt(9999)}", contestId: String = "AvB"): Cvr {
+    val builder =  CvrBuilder(cvrId, false)
+    builder.addVote( contestId, candidateId )
+    return builder.build()
 }
-
- */
 
 data class ContestVotes(val contestId: String, val votes: List<Vote>) {
     constructor(contestId: String) : this(contestId, emptyList())

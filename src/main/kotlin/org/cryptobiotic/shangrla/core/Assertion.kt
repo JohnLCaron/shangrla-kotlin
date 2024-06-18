@@ -30,7 +30,7 @@ data class Assertion(
     val assorter: Assorter,
     val winner: String,
     val loser: String,
-    val test: NonnegMean,
+    var test: NonnegMean,
     var margin: Double? = null,
     val p_value: Double? = null,
     val p_history: List<Double>? = null,
@@ -52,7 +52,7 @@ data class Assertion(
         return 2 * this.assorter.mean(cvr_list, use_style = use_style) - 1
     }
 
-    fun overstatement_assorter_margin(error_rate_1: Double, error_rate_2: Double): Double {
+    fun overstatement_assorter_margin(error_rate_1: Double = 0.0, error_rate_2: Double = 0.0): Double {
         /*
         find the overstatement assorter margin corresponding to an assumed rate of 1-vote and 2-vote overstatements
 
@@ -70,7 +70,7 @@ data class Assertion(
     }
 
 
-    fun overstatement_assorter_mean(error_rate_1: Double, error_rate_2: Double): Double {
+    fun overstatement_assorter_mean(error_rate_1: Double = 0.0, error_rate_2: Double = 0.0): Double {
         return (1 - error_rate_1 / 2 - error_rate_2) / (2 - this.margin!! / this.assorter.upper_bound)
     }
 
@@ -107,8 +107,7 @@ data class Assertion(
                 (2 - this.margin!! / this.assorter.upper_bound)
     }
 
-    /*
-    fun set_margin_from_cvrs(audit: Audit, cvr_list: List<CVR>) {
+    fun set_margin_from_cvrs(audit: Audit, cvr_list: List<Cvr>): Assertion {
         /*
         find assorter margin from cvrs and store it
 
@@ -147,14 +146,14 @@ data class Assertion(
         }
         this.margin = 2 * amean - 1
         if (this.contest.audit_type == AuditType.POLLING) {
-            this.test.u = this.assorter.upper_bound
+            this.test = this.test.copy(uOverride = this.assorter.upper_bound)
         } else if (this.contest.audit_type in listOf(AuditType.CARD_COMPARISON, AuditType.ONEAUDIT)) {
-            this.test.u = 2 / (2 - this.margin!! / this.assorter.upper_bound)
+            this.test = this.test.copy(uOverride = 2.0 / (2 - this.margin!! / this.assorter.upper_bound))
         } else {
             throw NotImplementedError("audit type {this.contest.audit_type} not supported")
         }
+        return this
     }
-     */
 
     fun find_margin_from_tally(tallyInput: Map<String, Int>? = null) {
         /*
@@ -228,7 +227,9 @@ data class Assertion(
         the numerical value corresponding to an overstatement of that multiple
         */
 
-        return (1 - overs / this.assorter.upper_bound) / (2 - this.margin!! / this.assorter.upper_bound)
+        val result =  (1 - overs / this.assorter.upper_bound) / (2 - this.margin!! / this.assorter.upper_bound)
+        println("make_overstatement = $result this.margin = ${this.margin}")
+        return result
     }
 
     fun mvrs_to_data(mvr_sample: List<Cvr>, cvr_sample: List<Cvr>): Pair<DoubleArray, Double> {
@@ -289,8 +290,13 @@ data class Assertion(
     }
 
     fun find_sample_size(
-        data: DoubleArray? = null, prefix: Boolean = false, rate1: Double? = null, rate2: Double? = null,
-        reps: Int? = null, quantile: Double = 0.5, seed: Int = 1234567890
+        data: DoubleArray? = null,
+        prefix: Boolean = false,
+        rate1: Double? = null,
+        rate2: Double? = null,
+        reps: Int? = null,
+        quantile: Double = 0.5,
+        seed: Int = 1234567890
     ): Int {
         /*
         Estimate sample size needed to reject the null hypothesis that the assorter mean is <=1/2,
@@ -404,6 +410,9 @@ data class Assertion(
                     else this.make_overstatement(overs = 0.5)
         val rate_1 = rate1 ?: ((1 - amargin) / 2)   // rate of small values
         var x = DoubleArray(this.test.N) { big } // array N floats, all equal to big
+        println("  big = $big small = $small")
+        // println("  x = ${x.contentToString()}")
+
 
         if (this.contest.audit_type == AuditType.POLLING) {
             if (this.contest.choice_function == SocialChoiceFunction.IRV) {
@@ -443,7 +452,8 @@ data class Assertion(
     // arange([start,] stop[, step,], dtype=None, *, like=None)
     // Return evenly spaced values within a given interval.
     fun numpy_arange(start: Int, stop: Int, step: Int): IntArray {
-        val size = 1 + (stop - start) / step
+        var size = (stop - start) / step
+        if (step * size != (stop - start)) size++
         return IntArray(size) { start + step * it}
     }
 
@@ -540,7 +550,7 @@ data class Assertion(
         }
 
         fun make_plurality_assertions(contest: Contest, winner: List<String>, loser: List<String>,
-                                      test: TestFn?, estim: EstimatorFn?, bet: BetFn?): Map<String, Assertion> {
+                                      test: TestFn? = null, estim: EstimatorFn? = null, bet: BetFn? = null): Map<String, Assertion> {
             /*
             Construct assertions that imply the winner(s) got more votes than the loser(s).
 
@@ -594,8 +604,10 @@ data class Assertion(
                         assorter = Assorter(
                             contest = contest,
                             assort =  { cvr: Cvr ->
-                                (Cvr.as_vote(cvr.get_vote_for(contest.id, winr)) -
-                                        Cvr.as_vote(cvr.get_vote_for(contest.id, losr)) + 1) * 0.5 },
+                                val w = Cvr.as_vote(cvr.get_vote_for(contest.id, winr))
+                                val l = Cvr.as_vote(cvr.get_vote_for(contest.id, losr))
+                                val calc = (w - l + 1) * 0.5
+                                calc},
                             upper_bound = 1.0,
                             ),
                     test = _test)
@@ -606,7 +618,7 @@ data class Assertion(
         }
 
         fun make_supermajority_assertion(contest: Contest, winner: String, loser: List<String>,
-                                         test: TestFn?, estim: EstimatorFn?, bet:BetFn?): Map<String, Assertion> {
+                 test: TestFn? = null, estim: EstimatorFn? = null, bet:BetFn? = null): Map<String, Assertion> {
             /*
             Construct assertion that winner got >= share_to_win \in (0,1) of the valid votes
 

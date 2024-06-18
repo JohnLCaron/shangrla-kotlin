@@ -4,11 +4,11 @@ import kotlin.math.ceil
 import kotlin.math.max
 
 class Stratum(
-    id: String,
-    max_cards: Int,
+    id: String? = null,
+    max_cards: Int? = null,
     val use_style: Boolean,
     replacement: Boolean,
-    audit_type: String,
+    audit_type: AuditType,
     //test:  callable=None,
     //estimator:  callable=None,
     //bet: callable=None,
@@ -18,18 +18,18 @@ class Stratum(
 enum class AuditType { POLLING, CARD_COMPARISON, ONEAUDIT }
 
 class Audit(
-    seed: Object,
+    seed: Object? = null,
     val sim_seed: Int,
-    cvr_file: String,
-    manifest_file: String,
-    sample_file: String,
-    mvr_file: String,
-    log_file: String,
+    cvr_file: String? = null,
+    manifest_file: String? = null,
+    sample_file: String? = null,
+    mvr_file: String? = null,
+    log_file: String? = null,
     val quantile: Double,
     val error_rate_1: Double,
     val error_rate_2: Double,
     val reps: Int,
-    max_cards: Int,
+    max_cards: Int? = null,
     val strata: Map<String, Stratum>,
 ) {
     init {

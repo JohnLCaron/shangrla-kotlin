@@ -11,7 +11,7 @@ class Contest(
     val name: String = id,
     val candidates: List<String>,
     val choice_function: SocialChoiceFunction,
-    val assertions: MutableMap<String, Assertion> = mutableMapOf(),// key = winr + " v " + losr
+    var assertions: MutableMap<String, Assertion> = mutableMapOf(),// key = winr + " v " + losr
     val assertion_file: String? = null,
     val audit_type: AuditType = AuditType.CARD_COMPARISON,
     val betFn: BetFn? = null,
@@ -26,7 +26,7 @@ class Contest(
     var sample_size: Int? = null,
     var sample_threshold: Double? = null,
     val share_to_win: Double = 0.5,
-    val tally: MutableMap<String, Int> = mutableMapOf(),
+    val tally: MutableMap<String, Int> = mutableMapOf(), // candidate name -> vote count
     val use_style: Boolean = true,
 ) {
 

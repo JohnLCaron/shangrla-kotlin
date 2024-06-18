@@ -74,14 +74,14 @@ class Assorter(
 
         // sanity check
         if (use_style && !cvr.has_contest(this.contest.id)) {
-            throw Exception("use_style==True but ${cvr} does not contain contest ${this.contest.id}")
+            throw Exception("use_style==True but Cvr '${cvr.id}' does not contain contest '${this.contest.id}'")
         }
         // assort the MVR
         val mvr_assort = if (mvr.phantom || (use_style && !mvr.has_contest (this.contest.id))) 0.0
                          else this.assort(mvr)
 
         // assort the CVR
-        val phantomValue = if (cvr.phantom) 1 else 0 // TODO really ? int(cvr.phantom)
+        val phantomValue = if (cvr.phantom) 1.0 else 0.0 // TODO really ? int(cvr.phantom)
         val cvr_assort: Double = if (cvr.pool && this.tally_pool_means != null) this.tally_pool_means!![cvr.tally_pool]!!
                          else phantomValue / 2 + (1 - phantomValue) * this.assort(cvr)
 
