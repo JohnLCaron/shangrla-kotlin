@@ -1,10 +1,8 @@
-package org.cyrptobiotic.shangrla.reader
+package org.cyrptobiotic.shangrla.core
 
-import org.cryptobiotic.shangrla.*
 import org.cryptobiotic.shangrla.core.*
 import org.cryptobiotic.shangrla.reader.sigfig
-import org.cyrptobiotic.shangrla.AssertionUtils
-import org.cyrptobiotic.shangrla.AssertionUtils.Companion.find_margins
+import org.cyrptobiotic.shangrla.core.AssertionUtils.Companion.find_margins
 import org.junit.jupiter.api.Test
 import kotlin.random.Random
 
@@ -26,26 +24,6 @@ class TestCvr {
 //            fake_cvr_list.append(cvr)
 //    // return the list of CVRs generated
 //    return fake_cvr_list
-
-    fun generate_fake_cvrs(contest_dict: Map<String, List<Candidate>>, style_dict: Map<String, Style>): List<TestCVR> {
-        val fake_cvr_list = mutableListOf<TestCVR>()
-        for ((name, style) in style_dict) {
-            // loop through the number of cards of that style
-            for (i in 0..style.cards-1) {
-                // loop through the contests in that style and generate CVR
-                val cvr = TestCVR()
-                for (contestName in style.contests) {
-                    val candidates: List<Candidate> = contest_dict[contestName]!!
-                    val choice = choose(candidates)
-                    // randomly choose vote for that contest based on contest probabilities
-                    cvr.addVote(contestName, choice)
-                }
-                fake_cvr_list.add(cvr)
-            }
-        }
-        // return the list of CVRs generated
-        return fake_cvr_list
-    }
 
     class TestCVR {
         val votes = mutableMapOf<String, MutableMap<String, Int>>() // Map(contestId, Map(selectionId, vote))
@@ -95,7 +73,7 @@ class TestCvr {
 
     @Test
     fun testCounts() {
-        val fake_cvrs = generate_fake_cvrs(contest_dict, style_dict)
+        val fake_cvrs = generate_cvrs(contest_dict, style_dict)
 
         for (contest_name in contest_dict.keys) {
             println(contest_name)
@@ -103,7 +81,7 @@ class TestCvr {
             val counts: MutableMap<String, Int> = mutableMapOf("Candidate A" to 0, "Candidate B" to 0)
 
             for (cvr in fake_cvrs) {
-                if (cvr.hasContest(contest_name)) {
+                if (cvr.has_contest(contest_name)) {
                     for ((candidate, vote) in cvr.votes[contest_name]!!) {
                         val accum: Int = counts[candidate]!!
                         counts[candidate] = accum + vote
@@ -123,10 +101,9 @@ class TestCvr {
         }
     }
 
-    /*
     @Test
     fun testAudit() {
-        val fake_cvrs = generate_fake_cvrs(contest_dict, style_dict)
+        val cvrs = generate_cvrs(contest_dict, style_dict)
         
         // set values
         val seed = 1234567890  // use, e.g., 20 rolls of a 10-sided die. Seed doesn"t have to be numeric
@@ -134,78 +111,55 @@ class TestCvr {
         val risk_function = "alpha_mart"
 
         // because comparison audit, may want to add f parameter to bias alpha towards u
-        val risk_fn = { (x: DoubleArray, m, N) -> NonnegMean.alpha_mart(x, eta=(m+1)/2 , N=N, f=.1) }
+        // val risk_fn = { (x: DoubleArray, m, N) -> NonnegMean.alpha_mart(x, eta=(m+1)/2 , N=N, f=.1) }
         val g = 0.1
         val max_cards = 800
         val error_rate = 0.002
 
-        // class Contest(
-        //    val id: String,
-        //    name: String,
-        //    val risk_limit: Double,
-        //    val cards: Int,
-        //    val choice_function: SocialChoiceFunction,
-        //    n_winners: Int,
-        //    val share_to_win: Double,
-        //    val candidates: List<Candidates>,
-        //    winner: List<Any>,
-        //    assertion_file: String,
-        //    val audit_type: AuditType,
-        //    //test: callable=None,
-        //    g: Double,
-        //    //estim: callable=None,
-        //    //bet: callable=None,
-        //    val use_style: Boolean,
-        //    val assertions: Map<String, Assertion>, // TODO why is this a map?
-        //    val tally: Map<Candidates, Int>,
-        //    var sample_size: Int,
-        //    val sample_threshold: Double,
-        //)
-
         // Audit contest 2
         val contests: List<Contest> = listOf(
             Contest("Contest 1",
-                cards = 600,
+                ncards = 600,
                 choice_function = SocialChoiceFunction.PLURALITY,
                 n_winners = 1,
                 candidates = listOf("Candidate A", "Candidate B"),
-                reported_winners = "Candidate A",   // TODO no such field
+                reported_winners = listOf("Candidate A"),
             ),
             Contest("Contest 2",
-                cards = 600,
+                ncards = 600,
                 choice_function = SocialChoiceFunction.PLURALITY,
                 n_winners = 1,
                 candidates = listOf("Candidate A", "Candidate B"),
-                reported_winners = "Candidate A",
+                reported_winners = listOf("Candidate A"),
             ),
             Contest("Contest 1",
-                cards = 600,
+                ncards = 600,
                 choice_function = SocialChoiceFunction.PLURALITY,
                 n_winners = 1,
                 candidates = listOf("Candidate A", "Candidate B"),
-                reported_winners = "Candidate A",
+                reported_winners = listOf("Candidate A"),
             ),
         )
 
         // make assertions
         val all_assertions = Assertion.make_all_assertions(contests)
 
-        val (cvr_list, phantom_vrs) = CVR.make_phantoms(max_cards, fake_cvrs, contests, use_style=true, prefix="phantom-1-")
+        val (cvr_list, phantom_vrs) = Cvr.make_phantoms(max_cards, cvrs, contests, use_style=true, prefix="phantom-1-")
         print("Created ${phantom_vrs} phantom records")
 
         // assign random sample nums including phantoms
-        CVR.assign_sample_nums(cvr_list, prng=SHA256(32))
+        Cvr.assign_sample_nums(cvr_list)
 
         // Find smallest margin
         val min_margin = find_margins(contests, cvr_list, use_style=true)
         println(min_margin)
 
         // Check audit parameters
-        check_audit_parameters(risk_function, g, error_rate, contests)
+        // AssertionUtils.check_audit_parameters(risk_function, g, error_rate, contests)
 
         // find initial sample size
-        val rf = lambda x,m,N: risk_fn(x,m,N)[1]   // p_history is the second returned value
-        val ss_fn = lambda m, r, N: TestNonnegMean.initial_sample_size(risk_function=rf, N=N, margin=m, polling=false, error_rate=error_rate, alpha=r, reps=10) // change for comparison audits
+        //val rf = { (x,m,N) -> risk_fn(x,m,N)[1]   // p_history is the second returned value
+        //val ss_fn = { (m, r, N) -> TestNonnegMean.initial_sample_size(risk_function=rf, N=N, margin=m, polling=false, error_rate=error_rate, alpha=r, reps=10) // change for comparison audits
 
         /*
         val (total_sample_size, sample_size_contests) =
@@ -215,8 +169,8 @@ class TestCvr {
         println(total_sample_size)
         */
 
-        val total_sample_size = AssertionUtils.find_sample_size(contests, sample_size_function=ss_fn)
-        println(total_sample_size)
+        //val total_sample_size = AssertionUtils.find_sample_size(contests, sample_size_function=ss_fn)
+        //println(total_sample_size)
 
         // Created 0 phantom records
         //0.1200000000000001
@@ -224,13 +178,10 @@ class TestCvr {
         //50.99999999999999
     }
 
-     */
-
-    /*
     @Test
     fun testMakePhantoms() {
         val contests =  listOf(
-            ContestSimple("city_council",
+            ContestBuilder("city_council",
                 risk_limit = 0.05,
                 cards = 0,
                 choice_function = SocialChoiceFunction.PLURALITY,
@@ -238,7 +189,7 @@ class TestCvr {
                 candidates = listOf("Doug","Emily","Frank","Gail","Harry"),
                 reported_winners = listOf("Doug", "Emily", "Frank")
                 ),
-            ContestSimple("measure_1",
+            ContestBuilder("measure_1",
                 risk_limit = 0.05,
                 cards = 5,
                 choice_function = SocialChoiceFunction.SUPERMAJORITY,
@@ -249,19 +200,28 @@ class TestCvr {
             ),
         )
 
+        val cvrBuilders = CvrBuilders()
+            .add(id = "1",
+                ContestVotes("city_council", "Alice"),
+                ContestVotes("measure_1", "yes") )
+            .add(id = "2",
+                ContestVotes("city_council", "Bob"),
+                ContestVotes("measure_1", "yes") )
+            .add(id = "3",
+                ContestVotes("city_council", "Bob"),
+                ContestVotes("measure_1", "no") )
+            .add(id = "4",
+                ContestVotes("city_council", "Charlie"))
+            .add(id = "5",
+                ContestVotes("city_council", "Doug"))
+            .add(id = "6",
+                ContestVotes("measure_1", "no"))
 
-        val cvrs = listOf(
-            makeCvrSimple("1", false, Vote("city_council", "Alice"), Vote("measure_1", "yes")),
-            makeCvrSimple("2", false, Vote("city_council", "Bob"),   Vote("measure_1", "yes")),
-            makeCvrSimple("3", false, Vote("city_council", "Bob"),   Vote("measure_1", "no")),
-            makeCvrSimple("4", false, Vote("city_council", "Charlie")),
-            makeCvrSimple("5", false, Vote("city_council", "Doug")),
-            makeCvrSimple("6", false, Vote("measure_1", "no"))
-        )
         val max_cards = 8
         val prefix = "phantom-"
 
-        val (cvr_list, phantoms) = CvrSimple.make_phantoms(max_cards, cvrs, contests)
+        // TODO
+        // val (cvr_list, phantoms) = make_phantoms(max_cards, cvrs, contests)
 
         /*
         assert len(cvr_list) == 9
@@ -294,6 +254,24 @@ class TestCvr {
          */
     }
 
-     */
+    fun generate_cvrs(contest_dict: Map<String, List<Candidate>>, style_dict: Map<String, Style>): List<Cvr> {
+        val fake_cvr_list = mutableListOf<Cvr>()
+        for ((name, style) in style_dict) {
+            // loop through the number of cards of that style
+            for (i in 0..style.cards-1) {
+                // loop through the contests in that style and generate CVR
+                val builder = CvrBuilder(name, false)
+                for (contestName in style.contests) {
+                    val candidates: List<Candidate> = contest_dict[contestName]!!
+                    val choice = choose(candidates)
+                    // randomly choose vote for that contest based on contest probabilities
+                    builder.addVote(contestName, choice)
+                }
+                fake_cvr_list.add(builder.build())
+            }
+        }
+        // return the list of CVRs generated
+        return fake_cvr_list
+    }
 
 }

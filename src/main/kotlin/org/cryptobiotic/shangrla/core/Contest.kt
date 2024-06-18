@@ -8,25 +8,26 @@ enum class Candidates { ALL, ALL_OTHERS, WRITE_IN, NO_CANDIDATE }
 
 class Contest(
     val id: String,
-    val name: String,
-    val risk_limit: Double = 0.05,
-    val cards: Int = 0,
-    val choice_function: SocialChoiceFunction,
-    val n_winners: Int = 1,
-    val share_to_win: Double,
+    val name: String = id,
     val candidates: List<String>,
-    val reported_winners: List<String>, // TODO was called winners?
-    val assertion_file: String,
+    val choice_function: SocialChoiceFunction,
+    var assertions: MutableMap<String, Assertion> = mutableMapOf(),// key = winr + " v " + losr
+    val assertion_file: String? = null,
     val audit_type: AuditType = AuditType.CARD_COMPARISON,
-    val testFn: TestFn?,
+    val betFn: BetFn? = null,
+    val estimFn: EstimatorFn? = null,
+    val testFn: TestFn? = null,
     val g: Double = 0.1,
-    val estimFn: EstimatorFn?,
-    val bet: BetFn?,
+    val n_winners: Int = 1,
+    val reported_winners: List<String> = emptyList(), // TODO was called winners?
+    val risk_limit: Double = 0.05,
+    var ncvrs: Int = 0,
+    var ncards: Int = 0,
+    var sample_size: Int? = null,
+    var sample_threshold: Double? = null,
+    val share_to_win: Double = 0.5,
+    val tally: MutableMap<String, Int> = mutableMapOf(), // candidate name -> vote count
     val use_style: Boolean = true,
-    var assertions: Map<String, Assertion>, // TODO why is this a map?
-    var tally: MutableMap<String, Int>,
-    var sample_size: Int,
-    val sample_threshold: Double,
 ) {
 
     fun find_margins_from_tally() {
@@ -47,7 +48,7 @@ class Contest(
         }
     }
 
-    fun find_sample_size(audit: Audit, mvr_sample: List<CVR>, cvr_sample: List<CVR>): Int {
+    fun find_sample_size(audit: Audit, mvr_sample: List<Cvr>, cvr_sample: List<Cvr>): Int {
         /*
         Estimate the sample size required to confirm the contest at its risk limit.
 
@@ -78,19 +79,19 @@ class Contest(
                 val (data, u) = a.mvrs_to_data(mvr_sample, cvr_sample)
             }
             this.sample_size = max(
-                this.sample_size,
+                this.sample_size ?: 0,
                 a.find_sample_size(
                     data = data, rate1 = audit.error_rate_1, rate2 = audit.error_rate_2,
                     reps = audit.reps, quantile = audit.quantile, seed = audit.sim_seed
                 )
             )
         }
-        return this.sample_size
+        return this.sample_size!!
     }
 
     companion object {
 
-        fun tally(contests: List<Contest>, cvr_list: List<CVR>) {
+        fun tally(contests: List<Contest>, cvr_list: List<Cvr>) {
             /*
             Tally the votes in the contests from a collection of CVRs.
             Only tallies plurality, multi-winner plurality, supermajority, and approval contests
@@ -133,7 +134,6 @@ class Contest(
                     )
                 ) {
                     wantContests.add(contest)
-                    contest.tally = mutableMapOf<String, Int>()
                 } else {
                     println("contest ${contest.id} (${contest.name}) has social choice function ${contest.choice_function}: not tabulated")
                 }

@@ -1,8 +1,6 @@
 package org.cryptobiotic.shangrla.core
 
-import kotlinx.serialization.MissingFieldException
-import kotlinx.serialization.internal.throwMissingFieldException
-import kotlin.math.min
+import java.util.Collections.min
 
 /*
     Parameters
@@ -27,13 +25,13 @@ import kotlin.math.min
         sample_size: estimated total sample size to complete the audit of this assertion
         tally_pool_means: dict of reported assorter means for each `tally_pool`, for ONEAudit
  */
-class Assertion(
+data class Assertion(
     val contest: Contest,
     val assorter: Assorter,
     val winner: String,
     val loser: String,
+    var test: NonnegMean,
     var margin: Double? = null,
-    val test: NonnegMean,
     val p_value: Double? = null,
     val p_history: List<Double>? = null,
     var proved: Boolean = false,
@@ -44,13 +42,17 @@ class Assertion(
         this.assorter.tally_pool_means = tally_pool_means
     }
 
+    fun min_p(): Double {
+        return min(p_history!!)
+    }
+
     //    The margin for a list of CVRs.
     //    By definition, the margin is twice the mean of the assorter, minus 1.}
-    fun margin(cvr_list: List<CVR>, use_style: Boolean): Double {
+    fun margin(cvr_list: List<Cvr>, use_style: Boolean): Double {
         return 2 * this.assorter.mean(cvr_list, use_style = use_style) - 1
     }
 
-    fun overstatement_assorter_margin(error_rate_1: Double, error_rate_2: Double): Double {
+    fun overstatement_assorter_margin(error_rate_1: Double = 0.0, error_rate_2: Double = 0.0): Double {
         /*
         find the overstatement assorter margin corresponding to an assumed rate of 1-vote and 2-vote overstatements
 
@@ -68,13 +70,13 @@ class Assertion(
     }
 
 
-    fun overstatement_assorter_mean(error_rate_1: Double, error_rate_2: Double): Double {
+    fun overstatement_assorter_mean(error_rate_1: Double = 0.0, error_rate_2: Double = 0.0): Double {
         return (1 - error_rate_1 / 2 - error_rate_2) / (2 - this.margin!! / this.assorter.upper_bound)
     }
 
 
     // TODO original fun overstatement_assorter(mvr: List<CVR>, cvr: List<CVR>, use_style: Boolean): Double {
-    fun overstatement_assorter(mvr: CVR, cvr: CVR, use_style: Boolean): Double {
+    fun overstatement_assorter(mvr: Cvr, cvr: Cvr, use_style: Boolean): Double {
         /*
         assorter that corresponds to normalized overstatement error for an assertion
 
@@ -105,7 +107,7 @@ class Assertion(
                 (2 - this.margin!! / this.assorter.upper_bound)
     }
 
-    fun set_margin_from_cvrs(audit: Audit, cvr_list: List<CVR>) {
+    fun set_margin_from_cvrs(audit: Audit, cvr_list: List<Cvr>): Assertion {
         /*
         find assorter margin from cvrs and store it
 
@@ -144,12 +146,13 @@ class Assertion(
         }
         this.margin = 2 * amean - 1
         if (this.contest.audit_type == AuditType.POLLING) {
-            this.test.u = this.assorter.upper_bound
+            this.test = this.test.copy(uOverride = this.assorter.upper_bound)
         } else if (this.contest.audit_type in listOf(AuditType.CARD_COMPARISON, AuditType.ONEAUDIT)) {
-            this.test.u = 2 / (2 - this.margin!! / this.assorter.upper_bound)
+            this.test = this.test.copy(uOverride = 2.0 / (2 - this.margin!! / this.assorter.upper_bound))
         } else {
             throw NotImplementedError("audit type {this.contest.audit_type} not supported")
         }
+        return this
     }
 
     fun find_margin_from_tally(tallyInput: Map<String, Int>? = null) {
@@ -193,14 +196,14 @@ class Assertion(
 
         val tally = tallyInput ?: this.contest.tally
         if (this.contest.choice_function in listOf(SocialChoiceFunction.PLURALITY, SocialChoiceFunction.APPROVAL)) {
-            this.margin = (tally[this.winner]!! - tally[this.loser]!!).toDouble() / this.contest.cards // // TODO check nullable
+            this.margin = (tally[this.winner]!! - tally[this.loser]!!).toDouble() / this.contest.ncards // // TODO check nullable
         } else if (this.contest.choice_function == SocialChoiceFunction.SUPERMAJORITY) {
             if (this.winner == Candidates.NO_CANDIDATE.name || this.loser != Candidates.ALL_OTHERS.name) {
                 throw NotImplementedError("TO DO: currently only support super-majority with a winner")
             } else {
                 // val q = np.sum([tally[c] for c in this.contest.candidates])/this.contest.cards
-                val q = this.contest.candidates.map { tally[it]!! }.sum() / this.contest.cards // LOOK check nullable
-                val p = tally[this.winner]!! / this.contest.cards // LOOK check nullable
+                val q = this.contest.candidates.map { tally[it]!! }.sum() / this.contest.ncards // LOOK check nullable
+                val p = tally[this.winner]!! / this.contest.ncards // LOOK check nullable
                 this.margin = q * (p / this.contest.share_to_win - 1)
             }
         } else {
@@ -224,10 +227,12 @@ class Assertion(
         the numerical value corresponding to an overstatement of that multiple
         */
 
-        return (1 - overs / this.assorter.upper_bound) / (2 - this.margin!! / this.assorter.upper_bound)
+        val result =  (1 - overs / this.assorter.upper_bound) / (2 - this.margin!! / this.assorter.upper_bound)
+        println("make_overstatement = $result this.margin = ${this.margin}")
+        return result
     }
 
-    fun mvrs_to_data(mvr_sample: List<CVR>, cvr_sample: List<CVR>): Pair<DoubleArray, Double> {
+    fun mvrs_to_data(mvr_sample: List<Cvr>, cvr_sample: List<Cvr>): Pair<DoubleArray, Double> {
         /*
         Process mvrs (and, for comparison audits, cvrs) to create data for the assertion"s test 
         and for sample size simulations.
@@ -262,7 +267,7 @@ class Assertion(
         var u: Double
         if (con.audit_type in listOf(AuditType.CARD_COMPARISON, AuditType.ONEAUDIT)) {
             require(mvr_sample.size == cvr_sample.size)
-            val cvr2: List<Pair<CVR, CVR>> = mvr_sample.zip(cvr_sample)
+            val cvr2: List<Pair<Cvr, Cvr>> = mvr_sample.zip(cvr_sample)
 
             //       d = np.array(
             //                [this.overstatement_assorter(mvr_sample[i], cvr_sample[i], use_style=use_style)
@@ -270,7 +275,7 @@ class Assertion(
             //                         if ((not use_style) or
             //                         (cvr_sample[i].has_contest(con.id) and cvr_sample[i].sample_num <= con.sample_threshold))
             //                ])
-            d = cvr2.filter { (mvr, cvr) -> !use_style || (cvr.has_contest(con.id) && cvr.sample_num <= con.sample_threshold) }
+            d = cvr2.filter { (mvr, cvr) -> !use_style || (cvr.has_contest(con.id) && cvr.sample_num!! <= con.sample_threshold!!) }
                     .map { (mvr, cvr) -> this.overstatement_assorter(mvr, cvr, use_style) }
             u = 2 / (2 - margin / upper_bound)
         } else if (con.audit_type == AuditType.POLLING) {  // Assume style information is irrelevant
@@ -285,8 +290,13 @@ class Assertion(
     }
 
     fun find_sample_size(
-        data: DoubleArray? = null, prefix: Boolean = false, rate1: Double? = null, rate2: Double? = null,
-        reps: Int? = null, quantile: Double = 0.5, seed: Int = 1234567890
+        data: DoubleArray? = null,
+        prefix: Boolean = false,
+        rate1: Double? = null,
+        rate2: Double? = null,
+        reps: Int? = null,
+        quantile: Double = 0.5,
+        seed: Int = 1234567890
     ): Int {
         /*
         Estimate sample size needed to reject the null hypothesis that the assorter mean is <=1/2,
@@ -400,6 +410,9 @@ class Assertion(
                     else this.make_overstatement(overs = 0.5)
         val rate_1 = rate1 ?: ((1 - amargin) / 2)   // rate of small values
         var x = DoubleArray(this.test.N) { big } // array N floats, all equal to big
+        println("  big = $big small = $small")
+        // println("  x = ${x.contentToString()}")
+
 
         if (this.contest.audit_type == AuditType.POLLING) {
             if (this.contest.choice_function == SocialChoiceFunction.IRV) {
@@ -439,7 +452,8 @@ class Assertion(
     // arange([start,] stop[, step,], dtype=None, *, like=None)
     // Return evenly spaced values within a given interval.
     fun numpy_arange(start: Int, stop: Int, step: Int): IntArray {
-        val size = 1 + (stop - start) / step
+        var size = (stop - start) / step
+        if (step * size != (stop - start)) size++
         return IntArray(size) { start + step * it}
     }
 
@@ -536,7 +550,7 @@ class Assertion(
         }
 
         fun make_plurality_assertions(contest: Contest, winner: List<String>, loser: List<String>,
-                                      test: TestFn?, estim: EstimatorFn?, bet: BetFn?): Map<String, Assertion> {
+                                      test: TestFn? = null, estim: EstimatorFn? = null, bet: BetFn? = null): Map<String, Assertion> {
             /*
             Construct assertions that imply the winner(s) got more votes than the loser(s).
 
@@ -574,14 +588,14 @@ class Assertion(
             val assertions = mutableMapOf<String, Assertion>()
             val test = test ?: contest.testFn
             val estim = estim ?: contest.estimFn
-            val bet = bet ?: contest.bet
+            val bet = bet ?: contest.betFn
 
             for (winr in winner) {
                 for (losr in loser) {
                     val wl_pair = winr + " v " + losr
                     val _test = NonnegMean(
-                        testFn = test, estimFn = estim, betFn = bet, /* g = contest.g, */ u = 1.0, N = contest.cards,
-                        t = .5, random_order = true)
+                        u = 1.0, N = contest.ncards, t = .5,
+                        testFnOverride = test, estimFnOverride = estim, betFnOverride = bet, gOverride = contest.g)
 
                     assertions[wl_pair] = Assertion(
                         contest,
@@ -589,9 +603,11 @@ class Assertion(
                         loser = losr,
                         assorter = Assorter(
                             contest = contest,
-                            assort =  { cvr: CVR ->
-                                (CVR.as_vote(cvr.get_vote_for(contest.id, winr)) -
-                                        CVR.as_vote(cvr.get_vote_for(contest.id, losr)) + 1) * 0.5 },
+                            assort =  { cvr: Cvr ->
+                                val w = Cvr.as_vote(cvr.get_vote_for(contest.id, winr))
+                                val l = Cvr.as_vote(cvr.get_vote_for(contest.id, losr))
+                                val calc = (w - l + 1) * 0.5
+                                calc},
                             upper_bound = 1.0,
                             ),
                     test = _test)
@@ -602,7 +618,7 @@ class Assertion(
         }
 
         fun make_supermajority_assertion(contest: Contest, winner: String, loser: List<String>,
-                                         test: TestFn, estim: EstimatorFn, bet:BetFn): Map<String, Assertion> {
+                 test: TestFn? = null, estim: EstimatorFn? = null, bet:BetFn? = null): Map<String, Assertion> {
             /*
             Construct assertion that winner got >= share_to_win \in (0,1) of the valid votes
 
@@ -658,15 +674,15 @@ class Assertion(
             cands.add(winner)
 
             val _test = NonnegMean(
-                testFn = test, estimFn = estim, betFn = bet, u = 1 / (2 * contest.share_to_win),
-                N = contest.cards, t = 0.5, random_order = true
+                u = 1 / (2 * contest.share_to_win), N = contest.ncards, t = 0.5,
+                testFnOverride = test, estimFnOverride = estim, betFnOverride = bet,
             )
             assertions[wl_pair] = Assertion(
                 contest, winner = winner, loser = Candidates.ALL_OTHERS.name,
                 assorter = Assorter(
                     contest = contest,
-                    assort =  { cvr: CVR -> if (cvr.has_one_vote(contest.id, cands))
-                        (CVR.as_vote(cvr.get_vote_for(contest.id, winner))
+                    assort =  { cvr: Cvr -> if (cvr.has_one_vote(contest.id, cands))
+                        (Cvr.as_vote(cvr.get_vote_for(contest.id, winner))
                         / (2 * contest.share_to_win)) else .5 },
                 upper_bound = 1 / (2 * contest.share_to_win)),
                 test = _test)
@@ -674,23 +690,13 @@ class Assertion(
             return assertions
         }
 
-        /*
         fun make_all_assertions(contests: List<Contest>) {
             /*
             Construct all the assertions to audit the contests and add the assertions to the contest dict
 
-            Parameters
-            ----------
-            contests: dict of Contest objects
-
-            Returns
-            -------
-            true
-
             Side Effects
             ------------
-            creates assertions and adds the dict of assertions relevant to each contest to the contest
-            object's `assertions` attribute
+            creates assertions and adds the dict of assertions relevant to each contest to the contest object's `assertions` attribute
             */
             //         for c, con in contests.items():
             //            scf = con.choice_function
@@ -717,22 +723,22 @@ class Assertion(
             //        return True
             for (contest in contests) {
                 val scf = contest.choice_function
-                val winrs = contest.winner // TODO another magic field
-                val losrs = setOf(contest.candidates).minus(setOf(winrs)).toList()
+                val winrs = contest.reported_winners
+                val losrs = contest.candidates.filter { !winrs.contains(it) }
                 val test = contest.testFn
                 val estim = contest.estimFn
-                val bet = contest.bet
+                val bet = contest.betFn
                 if (scf == SocialChoiceFunction.PLURALITY) {
-                    contest.assertions = make_plurality_assertions(
+                    contest.assertions.putAll(make_plurality_assertions(
                         contest = contest, winner = winrs, loser = losrs,
-                        test = test, estim = estim, bet = contest.bet
-                    )
+                        test = test, estim = estim, bet = contest.betFn
+                    ))
                 } else if (scf == SocialChoiceFunction.SUPERMAJORITY) {
-                    contest.assertions = make_supermajority_assertion(
+                    contest.assertions.putAll(make_supermajority_assertion(
                         contest = contest, winner = winrs[0],
                         loser = losrs, /* share_to_win = contest.share_to_win, */
                         test = test, estim = estim, bet = bet
-                    )
+                    ))
 /*                } else if (scf == SocialChoiceFunction.IRV) {
                     // TODO like magic, contest.assertion_json appears from thin air!
                     // Assumption: contests[c].assertion_json yields list assertions in JSON format.
@@ -747,8 +753,6 @@ class Assertion(
                 }
             }
         }
-
-         */
 
         /*
         fun set_all_margins_from_cvrs(audit: Audit, contests: List<Contest>, cvr_list: List<CVR>): Double {

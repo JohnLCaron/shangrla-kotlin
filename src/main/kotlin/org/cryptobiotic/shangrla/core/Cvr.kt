@@ -1,5 +1,7 @@
 package org.cryptobiotic.shangrla.core
 
+import kotlin.random.Random
+
 /*
     Generic class for cast-vote records.
 
@@ -10,19 +12,19 @@ package org.cryptobiotic.shangrla.core
     contain a valid vote in one or more contests.
 
     Class method get_vote_for returns the vote for a given candidate if the candidate is a
-    key in the CVR, or False if the candidate is not in the CVR.
+    key in the CVR, or false if the candidate is not in the CVR.
 
     This allows very flexible representation of votes, including ranked voting.
 
     For instance, in a plurality contest with four candidates, a vote for Alice (and only Alice)
     in a mayoral contest could be represented by any of the following:
-            {"id": "A-001-01", "pool": False, "pool_group": "ABC", "phantom:: False"votes": {"mayor": {"Alice": True}}}
+            {"id": "A-001-01", "pool": false, "pool_group": "ABC", "phantom:: false"votes": {"mayor": {"Alice": true}}}
             {"id": "A-001-01", "votes": {"mayor": {"Alice": "marked"}}}
             {"id": "A-001-01", "votes": {"mayor": {"Alice": 5}}}
             {"id": "A-001-01", "votes": {"mayor": {"Alice": 1, "Bob": 0, "Candy": 0, "Dan": ""}}}
-            {"id": "A-001-01", "votes": {"mayor": {"Alice": True, "Bob": False}}}
+            {"id": "A-001-01", "votes": {"mayor": {"Alice": true, "Bob": false}}}
     A CVR that contains a vote for Alice for "mayor" and a vote for Bob for "DA" could be represented as
-            {"id": "A-001-01", "votes": {"mayor": {"Alice": True}, "DA": {"Bob": True}}}
+            {"id": "A-001-01", "votes": {"mayor": {"Alice": true}, "DA": {"Bob": true}}}
 
     NOTE: some methods distinguish between a CVR that contains a particular contest, but no valid
     vote in that contest, and a CVR that does not contain that contest at all. Thus, the following
@@ -55,7 +57,7 @@ package org.cryptobiotic.shangrla.core
 
     get_vote_for:
          get_vote_for(candidate, contest_id) returns the value in the votes dict for the key `candidate`, or
-         False if the candidate did not get a vote or the contest_id is not in the CVR
+         false if the candidate did not get a vote or the contest_id is not in the CVR
     has_contest: returns bool
          does the CVR have the contest?
     cvrs_to_json:
@@ -66,17 +68,16 @@ package org.cryptobiotic.shangrla.core
     from_raire:
          create CVRs from the RAIRE representation
  */
-class CVR (
+class Cvr (
     val id: String,
-    val votes : MutableMap<String, Map<String, Int>>, // contest : candidate : vote
     var phantom: Boolean,
-    var tally_pool: String,    // what tallying pool of cards does this CVR belong to (used by ONEAudit)? TODO String?
-    var pool: Boolean,      // pool votes on this CVR within its tally_pool?
-    val sample_num: Double,  // pseudorandom number used for consistent sampling
-    var p: Double,           // sampling probability
-    val sampled: Boolean,   // is this CVR in the sample?
+    val votes : MutableMap<String, MutableMap<String, Int>>, // contest : candidate : vote
+    var tally_pool: String? = null,    // what tallying pool of cards does this CVR belong to (used by ONEAudit)? TODO String?
+    var pool: Boolean = false,      // pool votes on this CVR within its tally_pool?
+    var sample_num: Double? = null,  // pseudorandom number used for consistent sampling
+    var p: Double? = null,           // sampling probability
+    var sampled: Boolean = false,   // is this CVR in the sample?
 ) {
-    val mvotes = mutableMapOf<String, MutableMap<String, Int>>() // Map(contestId, Map(selectionId, vote))
 
     fun get_vote_for(contest_id: String, candidate: String): Int? {
         val contest: Map<String, Int>? = votes[contest_id]
@@ -84,49 +85,6 @@ class CVR (
     }
 
     fun has_contest(contest_id: String): Boolean = votes[contest_id] != null
-
-    // add votes
-    fun update_votes(votes: Map<String, Map<String, Int>>): Boolean {
-
-        /*
-        Update the votes for any contests the CVR already contains; add any contests and votes not already contained
-
-        Parameters
-        ----------
-        votes: dict of dict of dicts
-        key is a contest id; value is a dict of votes--keys and values
-
-        Returns
-        -------
-        added: bool
-        True if the contest was already present; else false
-        TODO true if any contests were added.
-
-        Side effects
-        ------------
-        updates the CVR to add the contest if it was not already present and to update the votes
-        */
-        //         added = False
-        //        for c, v in votes.items():
-        //            if self.has_contest(c):
-        //                self.votes[c].update(v)
-        //            else:
-        //                self.votes[c] = v
-        //                added = True
-        //        return added
-
-        var added = false
-        for ((contest, contestVotes) in votes) {
-            if (this.has_contest(contest)) {
-                val myContestVotes = this.votes[contest]!!
-                this.votes[contest] = myContestVotes + contestVotes
-            } else {
-                this.votes[contest] = contestVotes.toMutableMap()
-                added = true
-            }
-        }
-        return added
-    }
 
     fun has_one_vote(contest_id: String, candidates: List<String>): Boolean {
         /*
@@ -139,12 +97,12 @@ class CVR (
 
         Returns:
         ----------
-        True if there is exactly one vote among those candidates in that contest, where a
-        vote means that the value for that key casts as boolean True.
+        true if there is exactly one vote among those candidates in that contest, where a
+        vote means that the value for that key casts as boolean true.
     */
         //         v = np.sum([0 if c not in self.votes[contest_id] else bool(self.votes[contest_id][c]) \
         //                    for c in candidates])
-        //        return True if v==1 else False
+        //        return true if v==1 else false
 
         val contestVotes = this.votes[contest_id]
         if (contestVotes == null) return false
@@ -218,42 +176,8 @@ class CVR (
         fun as_vote(vote: Int?): Int {
             return if (vote == null || vote == 0) 0 else vote
         }
+
         /*
-        fun from_dict(cvr_dict: List<Any>): List<CVR> {
-            /*
-            Construct a list of CVR objects from a list of dicts containing cvr data
-
-            Parameters:
-            -----------
-            cvr_dict: a list of dicts, one per cvr
-
-            Returns:
-            ---------
-            list of CVR objects
-            */
-            val cvr_list = mutableListOf<CVR>()
-            for (c in cvr_dict) {
-                val phantom = False if ("phantom") not in c . keys () else c["phantom"]
-                val pool = None if "pool" not in c . keys () else c["pool"]
-                val tally_pool = None if "tally_pool" not in c . keys () else c["tally_pool"]
-                val sample_num = None if "sample_num" not in c . keys () else c["sample_num"]
-                val p = None if "p" not in c . keys () else c["p"]
-                val sampled = None if "sampled" not in c . keys () else c["sampled"]
-                cvr_list.append(
-                    CVR(
-                        id = c["id"],
-                        startingVotes = c["votes"],
-                        phantom = phantom,
-                        pool = pool,
-                        tally_pool = tally_pool,
-                        sample_num = sample_num,
-                        p = p,
-                        sampled = sampled
-                    )
-                )
-            }
-            return cvr_list
-        }
 
         fun from_raire(raire: List<Any>, phantom: Boolean): Pair<List<Any>, Int> {
             /*
@@ -293,7 +217,7 @@ class CVR (
             return CVR.merge_cvrs(cvr_list), len(raire)-skip
         } */
 
-        fun merge_cvrs(cvr_list: List<CVR>): List<CVR> {
+        fun merge_cvrs(cvr_list: List<Cvr>): List<Cvr> {
             /*
             Takes a list of CVRs that might contain duplicated ballot ids and merges the votes
             so that each identifier is listed only once, and votes from different records for that
@@ -302,9 +226,9 @@ class CVR (
             for the same contest as a previous mention, the votes in that contest are updated
             per the later mention.
 
-            If any of the CVRs has phantom==False, sets phantom=False in the result.
+            If any of the CVRs has phantom==false, sets phantom=false in the result.
             If only one of a multiple has `tally_pool`, set the tally_pool to that value; if they disagree, throw an error
-            Set `pool=True` if any CVR with the ID has `pool=True`
+            Set `pool=true` if any CVR with the ID has `pool=true`
 
 
             Parameters:
@@ -337,37 +261,35 @@ class CVR (
             //                od[c.id].pool = od[c.id] or c.pool
             //        return [v for v in od.values()]
 
-        val od = sortedMapOf<String, CVR>()
-        for (cvr: CVR in cvr_list) {
-            if (!od.contains(cvr.id))
-                od[cvr.id] = cvr
-            else {
-                val useCvr = od[cvr.id]!!
-                // TODO useCvr.votes = { **od[c.id].votes, **c.votes }
-                useCvr.phantom = (cvr.phantom and useCvr.phantom)
-                useCvr.pool = (cvr.pool or useCvr.pool)
-                if (
-                    (useCvr.tally_pool == null && cvr.tally_pool == null) ||
-                    (useCvr.tally_pool != null && cvr.tally_pool == null) ||
-                    (useCvr.tally_pool == cvr.tally_pool)
-                ) {
-                    ;
-                } else if ((useCvr.tally_pool == null) && (cvr.tally_pool != null)) {
-                    useCvr.tally_pool = cvr.tally_pool
-                } else {
-                    throw Exception("two CVRs with the same ID have different tally_pools: \n{str(od)=}\n{str(c)=}")
+            val od = sortedMapOf<String, Cvr>()
+            for (cvr: Cvr in cvr_list) {
+                if (!od.contains(cvr.id))
+                    od[cvr.id] = cvr
+                else {
+                    val useCvr = od[cvr.id]!!
+                    // TODO useCvr.votes = { **od[c.id].votes, **c.votes }
+                    useCvr.phantom = (cvr.phantom and useCvr.phantom)
+                    useCvr.pool = (cvr.pool || useCvr.pool)
+                    if (
+                        (useCvr.tally_pool == null && cvr.tally_pool == null) ||
+                        (useCvr.tally_pool != null && cvr.tally_pool == null) ||
+                        (useCvr.tally_pool == cvr.tally_pool)
+                    ) {
+                        ;
+                    } else if ((useCvr.tally_pool == null) && (cvr.tally_pool != null)) {
+                        useCvr.tally_pool = cvr.tally_pool
+                    } else {
+                        throw Exception("two CVRs with the same ID have different tally_pools: \n{str(od)=}\n{str(c)=}")
+                    }
+                    // od[c.id].pool = od[c.id] or c.pool // TODO error in srla?
+                    useCvr.pool = useCvr.pool || cvr.pool
                 }
-                // od[c.id].pool = od[c.id] or c.pool // TODO error in srla?
-                useCvr.pool = useCvr.pool || cvr.pool
             }
-        }
             return od.values.toList()
         }
 
-        /*
-
-        fun make_phantoms(max_cards: Int, cvr_list: List<CVR>, contests: List<Contest>, use_style: Boolean=true, prefix: String = "")
-        : Pair<List<CVR>, Int> {
+        fun make_phantoms(max_cards: Int, cvr_list: List<Cvr>, contests: List<Contest>, use_style: Boolean=true, prefix: String = "")
+        : Pair<List<Cvr>, Int> {
             /*
             Make phantom CVRs as needed for phantom cards; set contest parameters `cards` (if not set) and `cvrs`
 
@@ -406,38 +328,38 @@ class CVR (
             //        if not use_style:              #  make (max_cards - len(cvr_list)) phantoms
             //            phantoms = max_cards - n_cvrs
             //            for i in range(phantoms):
-            //                phantom_vrs.append(CVR(id=prefix+str(i+1), votes={}, phantom=True))
+            //                phantom_vrs.append(CVR(id=prefix+str(i+1), votes={}, phantom=true))
             //        else:                          # create phantom CVRs as needed for each contest
             //            for c, v in contests.items():
             //                phantoms_needed = v['cards']-v['cvrs']
             //                while len(phantom_vrs) < phantoms_needed:
-            //                    phantom_vrs.append(CVR(id=prefix+str(len(phantom_vrs)+1), votes={}, phantom=True))
+            //                    phantom_vrs.append(CVR(id=prefix+str(len(phantom_vrs)+1), votes={}, phantom=true))
             //                for i in range(phantoms_needed):
             //                    phantom_vrs[i].votes[c]={}  # list contest c on the phantom CVR
             //            phantoms = len(phantom_vrs)
             //        cvr_list = cvr_list + phantom_vrs
             //        return cvr_list, phantoms
 
-            val phantom_vrs = mutableListOf<CVR>()
+            val phantom_vrs = mutableListOf<Cvr>()
             var n_phantoms: Int
             val n_cvrs = cvr_list.size
-            for (v in contests) { // } set contest parameters
-                v['cvrs'] = np.sum([cvr.has_contest(c) for cvr in cvr_list if not cvr . is_phantom ()])
-                v['cards'] = max_cards if v['cards'] is None else v['cards'] // upper bound on cards cast in the contest
+            for (contest in contests) { // } set contest parameters
+                contest.ncvrs = cvr_list.filter { it.has_contest(contest.id) && !it.phantom }.count()
+                contest.ncards =  if (contest.ncards == null) max_cards else contest.ncards // upper bound on cards cast in the contest TODO
             }
             if (!use_style) {              //  make (max_cards-len(cvr_list)) phantoms
                 n_phantoms = max_cards - n_cvrs
-                for (i in range(phantoms)) {
-                    phantom_vrs.append(CVR(id = prefix + str(i + 1), votes = {}, phantom = true))
+                repeat (n_phantoms) {
+                    phantom_vrs.add(Cvr(id = "${prefix}${it + 1}",true, mutableMapOf())) // TODO wrong
                 }
             } else {                         // create phantom CVRs as needed for each contest
-                for (v in contests) {
-                    val phantoms_needed = v.cards - v.cvrs
+                for (contest in contests) {
+                    val phantoms_needed = contest.ncards - contest.ncvrs
                     while (phantom_vrs.size < phantoms_needed) {
-                        phantom_vrs.append(CVR(id = prefix + str(len(phantom_vrs) + 1), votes = {}, phantom = true))
+                        phantom_vrs.add(Cvr(id = "${prefix}${phantom_vrs.size + 1}", true, mutableMapOf())) // TODO wrong
                     }
-                    for (i in range(phantoms_needed)) {
-                        phantom_vrs[i].votes[c] = {}  // list contest c on the phantom CVR
+                    phantom_vrs.forEach {
+                        it.votes[contest.id] = mutableMapOf()  // list contest c on the phantom CVR
                     }
                 }
                 n_phantoms = phantom_vrs.size
@@ -446,10 +368,11 @@ class CVR (
             return Pair(result, n_phantoms)
         }
 
+        /*
         fun check_tally_pools(cvr_list: List<CVR>, force: Boolean = true): Pair<List<CVR>, Boolean> {
             /*
             Checks whether every CVR in each tally_pool has the same value of `pool`.
-            If `force==True`, set them all to True if any of them is True
+            If `force==true`, set them all to true if any of them is true
 
             Parameters:
             -----------
@@ -458,7 +381,7 @@ class CVR (
 
             Returns:
             -----------
-            tuple: list of CVRs and a bool. The bool is true if `force==True` and any value of `pool` was changed.
+            tuple: list of CVRs and a bool. The bool is true if `force==true` and any value of `pool` was changed.
             */
     //         for c in cvr_list:
     //            if c.id not in od:
@@ -521,7 +444,7 @@ class CVR (
             return contests
         }
 
-        fun add_pool_contests(cvrs: List<CVR>, tally_pools: dict): Boolean {
+        fun add_pool_contests(cvrs: List<Cvr>, tally_pools: dict): Boolean {
             /*
             for each tally_pool, ensure every CVR in that pool has every contest in that pool
 
@@ -535,40 +458,24 @@ class CVR (
 
             Returns
             -------
-            bool : True if any contest is added to any CVR
+            bool : true if any contest is added to any CVR
             */
             var added = false
-            for (c in cvrs) {
-                added =
-                    c.update_votes({ con: {} for con in tally_pools[c.tally_pool] }) || added
+            for (cvr in cvrs) {
+                // added = c.update_votes({ con: {} for con in tally_pools[c.tally_pool] }) || added
             } // note: order of terms matters!
             return added
         }
+         */
 
-
-        fun assign_sample_nums(cvrs: List<CVR>, prng: 'np.RandomState')
-        {
-            /*
-            Assigns a pseudo-random sample number to each cvr in cvr_list
-
-            Parameters
-            ----------
-            cvr_list: list of CVR objects
-            prng: instance of cryptorandom SHA256 generator
-
-            Returns
-            -------
-            True
-
-            Side effects
-            ------------
-            assigns (or overwrites) sample numbers in each CVR in cvr_list
-            */
-            for (cvr in cvr_list) {
-                cvr.sample_num = int_from_hash(prng.nextRandom())
+        // Assigns a pseudo-random sample number to each cvr in cvr_list
+        fun assign_sample_nums(cvr_list: List<Cvr>) {
+             for (cvr in cvr_list) {
+                cvr.sample_num = Random.nextDouble() // TODO SecureRandom ?
             }
         }
 
+        /*
 
         fun prep_comparison_sample(mvr_sample: List<CVR>, cvr_sample: List<CVR>, sample_order: list)
         {
@@ -672,7 +579,7 @@ class CVR (
     //            inx += 1
     //        for i in range(len(cvr_list)):
     //            if i in sampled_cvr_indices:
-    //                cvr_list[i].sampled = True
+    //                cvr_list[i].sampled = true
     //        return sampled_cvr_indices
 
             val current_sizes = defaultdict(int)

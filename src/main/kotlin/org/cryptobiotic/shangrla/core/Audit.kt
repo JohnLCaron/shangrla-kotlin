@@ -4,11 +4,11 @@ import kotlin.math.ceil
 import kotlin.math.max
 
 class Stratum(
-    id: String,
-    max_cards: Int,
+    id: String? = null,
+    max_cards: Int? = null,
     val use_style: Boolean,
     replacement: Boolean,
-    audit_type: String,
+    audit_type: AuditType,
     //test:  callable=None,
     //estimator:  callable=None,
     //bet: callable=None,
@@ -18,18 +18,18 @@ class Stratum(
 enum class AuditType { POLLING, CARD_COMPARISON, ONEAUDIT }
 
 class Audit(
-    seed: Object,
+    seed: Object? = null,
     val sim_seed: Int,
-    cvr_file: String,
-    manifest_file: String,
-    sample_file: String,
-    mvr_file: String,
-    log_file: String,
+    cvr_file: String? = null,
+    manifest_file: String? = null,
+    sample_file: String? = null,
+    mvr_file: String? = null,
+    log_file: String? = null,
     val quantile: Double,
     val error_rate_1: Double,
     val error_rate_2: Double,
     val reps: Int,
-    max_cards: Int,
+    max_cards: Int? = null,
     val strata: Map<String, Stratum>,
 ) {
     init {
@@ -39,9 +39,9 @@ class Audit(
 
     fun find_sample_size(
         contests: Map<String, Contest>,
-        cvrs: List<CVR>?,
-        mvr_sample: List<CVR>,
-        cvr_sample: List<CVR>
+        cvrs: List<Cvr>?,
+        mvr_sample: List<Cvr>,
+        cvr_sample: List<Cvr>
     ): Int {
         /*
         Estimate sample size for each contest && overall to allow the audit to complete.
@@ -167,18 +167,18 @@ class Audit(
                     cvr.p = 0.0
                     for ((c, con) in contests) {
                         if (cvr.has_contest(c) && !cvr.sampled) {
-                            val p1 = con.sample_size / (con.cards - old_sizes[c]!!)
-                            cvr.p = max(p1.toDouble(), cvr.p) // TODO nullability
+                            val p1 = con.sample_size!! / (con.ncards - old_sizes[c]!!)
+                            cvr.p = max(p1.toDouble(), cvr.p!!) // TODO nullability
                         }
                     }
                 }
             }
             // total_size = ceil(np.sum([x.p for x in cvrs if !x.phantom))
-            val summ: Double = cvrs.filter { !it.phantom }.map { it.p }.sum()
+            val summ: Double = cvrs.filter { !it.phantom }.map { it.p!! }.sum()
             total_size = ceil(summ).toInt()
         } else {
             // total_size = np.max(np.array([con.sample_size for con in contests.values()]))
-            total_size = contests.values.map { it.sample_size }.max()
+            total_size = contests.values.map { it.sample_size!! }.max()
         }
         return total_size
     }

@@ -1,8 +1,8 @@
-package org.cryptobiotic.shangrla
+package org.cyrptobiotic.shangrla.core
 
 import org.cryptobiotic.shangrla.core.SocialChoiceFunction
 
-class ContestSimple(
+class ContestBuilder(
     val id: String,
     val risk_limit: Double,
     val cards: Int?,
