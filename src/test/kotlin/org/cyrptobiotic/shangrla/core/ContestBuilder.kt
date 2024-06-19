@@ -5,7 +5,8 @@ import org.cryptobiotic.shangrla.core.SocialChoiceFunction
 class ContestBuilder(
     val id: String,
     val risk_limit: Double,
-    val cards: Int?,
+    var ncvrs: Int? = 0,
+    var cards: Int?,
     val choice_function: SocialChoiceFunction = SocialChoiceFunction.PLURALITY,
     val n_winners: Int,
     val candidates: List<String>,

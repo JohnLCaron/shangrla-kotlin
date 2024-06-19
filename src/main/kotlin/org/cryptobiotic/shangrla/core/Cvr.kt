@@ -79,12 +79,49 @@ class Cvr (
     var sampled: Boolean = false,   // is this CVR in the sample?
 ) {
 
-    fun get_vote_for(contest_id: String, candidate: String): Int? {
+    // TODO not distinguishing "not voted" vs "voted no on this candidate"
+    fun get_vote_for(contest_id: String, candidate: String): Int {
         val contest: Map<String, Int>? = votes[contest_id]
-        return if (contest == null) null else contest[candidate]
+        return if (contest == null) 0 else contest[candidate] ?: 0
+
+        //         return (
+        //            False
+        //            if (contest_id not in self.votes or candidate not in self.votes[contest_id])
+        //            else self.votes[contest_id][candidate]
+        //        )
     }
 
     fun has_contest(contest_id: String): Boolean = votes[contest_id] != null
+
+    fun update_votes(cvr: Cvr): Boolean {
+        /*
+        Update the votes for any contests the CVR already contains; add any contests and votes not already contained
+
+        Parameters
+        ----------
+        votes: key is a contest id; value is a dict of votes--keys and values
+
+        Returns
+        -------
+        added: True if the contest was already present; else false
+        added: True if any contests were added
+
+        Side effects
+        ------------
+        updates the CVR to add the contest if it was not already present and to update the votes
+        */
+        var added = false
+        for ((c, v) in cvr.votes) {
+           if (this.has_contest(c)) {
+               val wtf: MutableMap<String, Int> = this.votes[c]!!
+               this.votes[c] = (wtf + v).toMutableMap()
+            } else {
+                this.votes[c] = v
+                added = true
+            }
+        }
+        return added
+    }
 
     fun has_one_vote(contest_id: String, candidates: List<String>): Boolean {
         /*
@@ -104,6 +141,7 @@ class Cvr (
         //                    for c in candidates])
         //        return true if v==1 else false
 
+        // [0 if c not in self.votes[contest_id] else bool(self.votes[contest_id][c]) for c in candidates]
         val contestVotes = this.votes[contest_id]
         if (contestVotes == null) return false
 
@@ -132,9 +170,14 @@ class Cvr (
         val rank_loser = this.get_vote_for(contest_id, loser)
 
         //         if not bool(rank_winner) and bool(rank_loser):
-        if ((rank_winner == null) && (rank_loser != null)) return 1
-        //         elif bool(rank_winner) and bool(rank_loser) and rank_loser < rank_winner:
-        return if ((rank_winner != null) && (rank_loser != null) && rank_loser < rank_winner) 1 else 0
+        //            return 1
+        //        elif bool(rank_winner) and bool(rank_loser) and rank_loser < rank_winner:
+        //            return 1
+        //        else:
+        //            return 0
+
+        if (!python_bool(rank_winner) && python_bool(rank_loser)) return 1
+        return if (python_bool(rank_winner) && python_bool(rank_loser) && (rank_loser!! < rank_winner!!)) 1 else 0
     }
 
     fun rcv_votefor_cand(contest_id: String, cand: String, remaining: List<String>): Int {
@@ -162,14 +205,28 @@ class Cvr (
         if (!remaining.contains(cand)) return 0
 
         val rank_cand = this.get_vote_for(contest_id, cand)
-        if (rank_cand == null) return 0
+        if (!python_bool(rank_cand)) return 0
 
         for (altc in remaining) {
             if (altc == cand) continue
             val rank_altc = this.get_vote_for(contest_id, altc)
-            if ((rank_altc != null) && rank_altc <= rank_cand) return 0
+            if (python_bool(rank_altc) && rank_altc!! <= rank_cand!!) return 0
         }
         return 1
+
+        //         if not cand in remaining:
+        //            return 0
+        //
+        //        if not bool(rank_cand := self.get_vote_for(contest_id, cand)):
+        //            return 0
+        //        else:
+        //            for altc in remaining:
+        //                if altc == cand:
+        //                    continue
+        //                rank_altc = self.get_vote_for(contest_id, altc)
+        //                if bool(rank_altc) and rank_altc <= rank_cand:
+        //                    return 0
+        //            return 1
     }
 
     companion object {
@@ -615,79 +672,59 @@ class Cvr (
             }
             return sampled_cvr_indices
         }
+         */
 
-        fun tabulate_styles(cvr_list: List<CVR>) {
-            /*
-            tabulate unique CVR styles in cvr_list
-
-            Parameters
-            ----------
-            cvr_list: Collection
-            collection of CVR objects
-
-            Returns
-            -------
-            a dict of styles and the counts of those styles
-            */
-            // iterate through and find all the unique styles
-            val style_counts = defaultdict(int)
+        /**
+         * Find unique styles and count them.
+        * A style is a unique set of contest ids.
+        */
+        fun tabulate_styles(cvr_list: List<Cvr>): Map<Set<String>, Int> {
+            val style_counts = mutableMapOf<Set<String>, Int>()
             for (cvr in cvr_list) {
-                style_counts[frozenset(cvr.votes.keys)] += 1
+                val style: Set<String> = cvr.votes.keys.toSet()
+                val accum = style_counts.getOrPut(style) { 0 }
+                style_counts[style] = accum + 1
             }
             return style_counts
+
+            //val style_counts = defaultdict(int)
+            //for (cvr in cvr_list) {
+            //     style_counts[frozenset(cvr.votes.keys)] += 1
+            //}
+            //return style_counts
         }
 
-        fun tabulate_votes(cvr_list: List<CVR>)
-        {
-            /*
-            tabulate total votes for each candidate in each contest in cvr_list.
-            For plurality, supermajority, and approval. Not useful for ranked-choice voting.
-
-            Parameters
-            ----------
-            cvr_list: Collection
-                collection of CVR objects
-
-            Returns
-            -------
-            dict of dicts:
-                main key is contest
-                sub key is the candidate in the contest
-                value is the number of votes for that candidate in that contest
-            */
-            val d = defaultdict(lambda: defaultdict(int))
-            for (c in cvr_list) {
-                for ((con, votes) in c.votes) {
-                    for (cand in votes) {
-                        d[con][cand] += CVR.as_vote(c.get_vote_for(con, cand))
+        /**
+         * Tabulate total votes for each candidate in each contest in cvr_list.
+         * For plurality, supermajority, and approval. Not useful for ranked-choice voting.
+         * return contestId -> candidate -> votes
+         */
+        fun tabulate_votes(cvr_list: List<Cvr>): Map<String, Map<String, Int>>  {
+            val r = mutableMapOf<String, MutableMap<String, Int>>()
+            for (cvr in cvr_list) {
+                for ((con, conVotes) in cvr.votes) {
+                    val accumVotes = r.getOrPut(con) { mutableMapOf() }
+                    for ((cand, vote) in conVotes) {
+                        val accum = accumVotes.getOrPut(cand) { 0 }
+                        accumVotes[cand] = accum + vote
+                        // d[con][cand] += CVR.as_vote(c.get_vote_for(con, cand)) // TODO normalized to 0, 1 ?
                     }
                 }
             }
-            return d
+            return r
         }
 
-        fun tabulate_cards_contests(cvr_list: List<CVR>) {
-            /*
-            Tabulate the number of cards containing each contest
-
-            Parameters
-            ----------
-            cvr_list: collection of CVR objects
-
-            Returns
-            -------
-            dict:
-                main key is contest; value is the number of cards containing that contest
-            */
-            val d = defaultdict(int)
-            for (c in cvr_list) {
-                for (con in c.votes) {
-                    d[con] += 1
+        // Number of cards in each contest, return contestId -> ncards
+        fun tabulate_cards_contests(cvr_list: List<Cvr>): Map<String, Int> {
+            val d = mutableMapOf<String, Int>()
+            for (cvr in cvr_list) {
+                for (con in cvr.votes.keys) {
+                    val accum = d.getOrPut(con) { 0 }
+                    d[con] = accum + 1
                 }
             }
             return d
         }
-         */
 
     }
 

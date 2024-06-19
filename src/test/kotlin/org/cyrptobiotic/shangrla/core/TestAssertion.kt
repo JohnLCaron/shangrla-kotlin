@@ -5,6 +5,8 @@ import java.lang.Math.log
 import kotlin.math.ceil
 import kotlin.test.*
 
+// TODO test_rcv_assorter
+
 class TestAssertion {
     val con_test: Contest
     val plur_cvr_list: List<Cvr>
@@ -526,67 +528,6 @@ class TestAssertion {
             assert aVb . assorter . overstatement (mvrs[4], cvrs[0], use_style = False) == 1
             assert aVb . assorter . overstatement (mvrs[4], cvrs[1], use_style = true) == 0
             assert aVb . assorter . overstatement (mvrs[4], cvrs[1], use_style = False) == 0
-
-            // def test_overstatement(self):
-            //        mvr_dict = [{"id": 1, "votes": {"AvB": {"Alice":true}}},
-            //                    {"id": 2, "votes": {"AvB": {"Bob":true}}},
-            //                    {"id": 3, "votes": {"AvB": {}}},
-            //                    {"id": 4, "votes": {"CvD": {"Elvis":true, "Candy":False}}},
-            //                    {"id": "phantom_1", "votes": {"AvB": {}}, "phantom": true}]
-            //        mvrs = CVR.from_dict(mvr_dict)
-            //
-            //        cvr_dict = [{"id": 1, "votes": {"AvB": {"Alice":true}}},
-            //                    {"id": 2, "votes": {"AvB": {"Bob":true}}},
-            //                    {"id": 3, "votes": {"AvB": {}}},
-            //                    {"id": 4, "votes": {"CvD": {"Elvis":true}}},
-            //                    {"id": "phantom_1", "votes": {"AvB": {}}, "phantom": true}]
-            //        cvrs = CVR.from_dict(cvr_dict)
-            //
-            //        winner = ["Alice"]
-            //        loser = ["Bob"]
-            //
-            //        aVb = Assertion(contest=self.con_test, assorter=Assorter(contest=self.con_test,
-            //                        assort = (lambda c, contest_id="AvB", winr="Alice", losr="Bob":
-            //                        ( CVR.as_vote(c.get_vote_for("AvB", winr))
-            //                        - CVR.as_vote(c.get_vote_for("AvB", losr))
-            //                        + 1)/2), upper_bound=1))
-            //        assert aVb.assorter.overstatement(mvrs[0], cvrs[0], use_style=true) == 0
-            //        assert aVb.assorter.overstatement(mvrs[0], cvrs[0], use_style=False) == 0
-            //
-            //        assert aVb.assorter.overstatement(mvrs[0], cvrs[1], use_style=true) == -1
-            //        assert aVb.assorter.overstatement(mvrs[0], cvrs[1], use_style=False) == -1
-            //
-            //        assert aVb.assorter.overstatement(mvrs[2], cvrs[0], use_style=true) == 1/2
-            //        assert aVb.assorter.overstatement(mvrs[2], cvrs[0], use_style=False) == 1/2
-            //
-            //        assert aVb.assorter.overstatement(mvrs[2], cvrs[1], use_style=true) == -1/2
-            //        assert aVb.assorter.overstatement(mvrs[2], cvrs[1], use_style=False) == -1/2
-            //
-            //
-            //        assert aVb.assorter.overstatement(mvrs[1], cvrs[0], use_style=true) == 1
-            //        assert aVb.assorter.overstatement(mvrs[1], cvrs[0], use_style=False) == 1
-            //
-            //        assert aVb.assorter.overstatement(mvrs[2], cvrs[0], use_style=true) == 1/2
-            //        assert aVb.assorter.overstatement(mvrs[2], cvrs[0], use_style=False) == 1/2
-            //
-            //        assert aVb.assorter.overstatement(mvrs[3], cvrs[0], use_style=true) == 1
-            //        assert aVb.assorter.overstatement(mvrs[3], cvrs[0], use_style=False) == 1/2
-            //
-            //        try:
-            //            tst = aVb.assorter.overstatement(mvrs[3], cvrs[3], use_style=true)
-            //            raise AssertionError("aVb is not contained in the mvr or cvr")
-            //        except ValueError:
-            //            pass
-            //        assert aVb.assorter.overstatement(mvrs[3], cvrs[3], use_style=False) == 0
-            //
-            //        assert aVb.assorter.overstatement(mvrs[4], cvrs[4], use_style=true) == 1/2
-            //        assert aVb.assorter.overstatement(mvrs[4], cvrs[4], use_style=False) == 1/2
-            //        assert aVb.assorter.overstatement(mvrs[4], cvrs[4], use_style=False) == 1/2
-            //        assert aVb.assorter.overstatement(mvrs[4], cvrs[0], use_style=true) == 1
-            //        assert aVb.assorter.overstatement(mvrs[4], cvrs[0], use_style=False) == 1
-            //        assert aVb.assorter.overstatement(mvrs[4], cvrs[1], use_style=true) == 0
-            //        assert aVb.assorter.overstatement(mvrs[4], cvrs[1], use_style=False) == 0
-
          */
         }
 

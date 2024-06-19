@@ -91,24 +91,12 @@ class Contest(
 
     companion object {
 
+        /** Tally the votes in the contests from a collection of CVRs.
+         * Only tallies plurality, multi-winner plurality, supermajority, and approval contests
+         * Sets the `tally` dict for the contests in con_list, if their social choice function is appropriate
+         */
         fun tally(contests: List<Contest>, cvr_list: List<Cvr>) {
-            /*
-            Tally the votes in the contests from a collection of CVRs.
-            Only tallies plurality, multi-winner plurality, supermajority, and approval contests
-
-            Parameters
-            ----------
-            con_dict: dict; dict of Contest objects to find tallies for
-            cvr_list: list[CVR]; list of CVRs containing the votes to tally
-
-            Returns
-            -------
-
-            Side Effects
-            ------------
-            Sets the `tally` dict for the contests in con_list, if their social choice function is appropriate
-            */
-            //         tallies = {}
+            //        tallies = {}
             //        cons = []
             //        for id, c in con_dict.items():
             //            if c.choice_function in [Contest.SOCIAL_CHOICE_FUNCTION.PLURALITY,
@@ -119,12 +107,7 @@ class Contest(
             //            else:
             //                warnings.warn(f'contest {c.id} ({c.name}) has social choice function ' +
             //                              f'{c.choice_function}: not tabulated')
-            //        for cvr in cvr_list:
-            //            for c in cons:
-            //                if cvr.has_contest(c.id):
-            //                    for candidate, vote in cvr.votes[c.id].items():
-            //                        if candidate:
-            //                            c.tally[candidate] += int(bool(vote))
+
             val wantContests = mutableListOf<Contest>()
             for (contest in contests) {
                 if (contest.choice_function in listOf(
@@ -138,15 +121,20 @@ class Contest(
                     println("contest ${contest.id} (${contest.name}) has social choice function ${contest.choice_function}: not tabulated")
                 }
             }
+            //        for cvr in cvr_list:
+            //            for c in cons:
+            //                if cvr.has_contest(c.id):
+            //                    for candidate, vote in cvr.votes[c.id].items():
+            //                        if candidate:
+            //                            c.tally[candidate] += int(bool(vote))
             for (cvr in cvr_list) {
                 for (contest in wantContests) {
                     if (cvr.has_contest(contest.id)) {
-                        for ((candidate, vote) in cvr.votes[contest.id]!!) {
-                            if (candidate != null && (vote > 0)) {
-                                // contest.tally[candidate] += int(bool(vote)) // TODO int(bool(vote)) ??
-                                val accum = contest.tally[candidate]!!
-                                contest.tally[candidate] = accum + 1
-                            }
+                        val candMap = cvr.votes[contest.id]!!
+                        for ((candidate, vote) in candMap) {
+                            val accum = contest.tally.getOrPut(candidate) { 0 }
+                            val voteN = if (python_bool(vote)) 1 else 0
+                            contest.tally[candidate] = accum + voteN
                         }
                     }
                 }
