@@ -6,6 +6,22 @@ import kotlin.random.Random
 class CvrBuilders {
     val builders = mutableListOf<CvrBuilder>()
 
+    fun add(id: String, tally_pool: String? = null, pool: Boolean = false, sampled: Boolean = false, sample_num: Double? = null, p: Double? = null): CvrBuilders {
+        val cb = CvrBuilder(id)
+        cb.tally_pool = tally_pool
+        cb.pool = pool
+        cb.sampled = sampled
+        cb.sample_num = sample_num
+        cb.p = p
+        builders.add(cb)
+        return this
+    }
+
+    fun addBuilder(builder: CvrBuilder): CvrBuilders {
+        builders.add(builder)
+        return this
+    }
+
     fun add(id: String, tally_pool: String, vararg contests: ContestVotes): CvrBuilders {
         val cb = CvrBuilder(id)
         cb.tally_pool = tally_pool
@@ -25,8 +41,9 @@ class CvrBuilders {
         return this
     }
 
-    fun addBuilder(builder: CvrBuilder): CvrBuilders {
-        builders.add(builder)
+    fun setContestVotes(id: String, vararg contests: ContestVotes): CvrBuilders {
+        val cb = builders.find { it.id == id }!!
+        contests.forEach { cb.addContestVotes(it) }
         return this
     }
 
@@ -36,6 +53,9 @@ class CvrBuilders {
 
     fun poolContests(pool: String): Set<String> =
         builders.filter { it.tally_pool == pool }.map{ it.contests.keys }.flatten().toSet()
+
+    fun poolContests(): Set<String> =
+        builders.map{ it.contests.keys }.flatten().toSet()
 
     fun cvrsForPool(wantPool: String): List<CvrBuilder> =
         builders.filter { it.tally_pool == wantPool }
@@ -89,24 +109,39 @@ class CvrBuilder(
 ) {
     val contests = mutableMapOf<String, MutableMap<String, Int>>() // Map(contestId, Map(candidate, vote))
     var tally_pool: String? = null
+    var pool: Boolean = false
+    var p: Double? = null
+    var sampled: Boolean? = null
+    var sample_num: Double? = null
+
+    fun setTallyPool(pool: String): CvrBuilder {
+        this.tally_pool = pool
+        return this
+    }
+
+    fun setSamplingProbability(p: Double): CvrBuilder {
+        this.p = p
+        return this
+    }
 
     fun addContest(contestId: String): CvrBuilder {
         contests.getOrPut(contestId) { mutableMapOf() }
         return this
     }
 
-    fun addContestVotes(cv: ContestVotes) {
+    fun addContestVotes(cv: ContestVotes): CvrBuilder {
         val contest = contests.getOrPut(cv.contestId) { mutableMapOf() }
         cv.votes.forEach { (candidateName, vote) ->
             val accum: Int = contest.getOrPut(candidateName) { 0 }
             contest[candidateName] = accum + vote
         }
+        return this
     }
 
-    fun addVote(contestName: String, candidateName: String): CvrBuilder {
+    fun addVote(contestName: String, candidateName: String, addVote: Int = 1): CvrBuilder {
         val contest = contests.getOrPut(contestName) { mutableMapOf() }
         val vote: Int = contest.getOrPut(candidateName) { 0 }
-        contest[candidateName] = vote + 1
+        contest[candidateName] = vote + addVote
         return this
     }
 
@@ -150,8 +185,19 @@ class CvrBuilder(
         return added
     }
 
+    //     var tally_pool: String? = null
+    //    var pool: Boolean = false
+    //    var p: Double? = null
+    //    var sampled: Boolean? = null
+    //    var sample_num: Double? = null
     fun build() : Cvr {
-        return Cvr(id, phantom, contests, tally_pool = tally_pool)
+        return Cvr(id, phantom, contests,
+            tally_pool = this.tally_pool,
+            p = this.p,
+            pool = this.pool,
+            sampled = this.sampled ?: false,
+            sample_num = this.sample_num,
+        )
     }
 
     fun has_contest(contestId: String): Boolean {
@@ -177,6 +223,7 @@ data class ContestVotes(val contestId: String, val votes: List<Vote>) {
     constructor(contestId: String, candidateId: String) : this(contestId, listOf(Vote(candidateId, 1)))
     constructor(contestId: String, candidateId: String, vote: Int) : this(contestId, listOf(Vote(candidateId, vote)))
     constructor(contestId: String, candidateId: String, vote: Boolean) : this(contestId, listOf(Vote(candidateId, vote)))
+    constructor(contestId: String, vararg votes: Vote) : this(contestId, votes.toList())
 
     companion object {
         // TODO test we dont have duplicate candidates
@@ -227,6 +274,16 @@ fun make_phantoms(max_cards: Int, cvr_list: List<CvrBuilder>, contests: List<Con
     //        for c, v in contests.items():  # set contest parameters
     //            v['cvrs'] = np.sum([cvr.has_contest(c) for cvr in cvr_list if not cvr.is_phantom()])
     //            v['cards'] = max_cards if v['cards'] is None else v['cards'] // upper bound on cards cast in the contest
+
+    val phantom_vrs = mutableListOf<CvrBuilder>()
+    var n_phantoms: Int
+    val n_cvrs = cvr_list.size
+    for (contest in contests) { // } set contest parameters
+        // TODO these are intended to be set on the contest
+        contest.ncvrs = cvr_list.filter{ !it.phantom && it.has_contest(contest.id) }.count()
+        if (contest.cards == null) contest.cards = max_cards // upper bound on cards cast in the contest
+    }
+
     //        if not use_style:              #  make (max_cards - len(cvr_list)) phantoms
     //            phantoms = max_cards - n_cvrs
     //            for i in range(phantoms):
@@ -242,15 +299,6 @@ fun make_phantoms(max_cards: Int, cvr_list: List<CvrBuilder>, contests: List<Con
     //        cvr_list = cvr_list + phantom_vrs
     //        return cvr_list, phantoms
 
-    val phantom_vrs = mutableListOf<CvrBuilder>()
-    var n_phantoms: Int
-    val n_cvrs = cvr_list.size
-    for (contest in contests) { // } set contest parameters
-        // TODO these are intended to be set on the contest
-        val cvrs = cvr_list.filter{ !it.phantom && it.has_contest(contest.id) }
-        val cards = contest.cards ?: max_cards // upper bound on cards cast in the contest
-    }
-
     if (!use_style) {              //  make (max_cards-len(cvr_list)) phantoms
         n_phantoms = max_cards - n_cvrs
         repeat(n_phantoms) {
@@ -258,9 +306,12 @@ fun make_phantoms(max_cards: Int, cvr_list: List<CvrBuilder>, contests: List<Con
         }
     } else {                         // create phantom CVRs as needed for each contest
         for (contest in contests) {
-            val phantoms_needed = contest.cards!! // TODO - contest.cvrs
+            val phantoms_needed = contest.cards!! - contest.ncvrs!!
+            while (phantom_vrs.size < phantoms_needed) {
+                phantom_vrs.add( CvrBuilder("$prefix${phantom_vrs.size + 1}", true)) // .addContest(contest.id))
+            }
             repeat(phantoms_needed) {
-                phantom_vrs.add( CvrBuilder("$prefix${it + 1}", true)) // .addContest(contest.id)) TODO wrong
+                phantom_vrs[it].contests[contest.id]= mutableMapOf()  // list contest c on the phantom CVR
             }
         }
         n_phantoms = phantom_vrs.size

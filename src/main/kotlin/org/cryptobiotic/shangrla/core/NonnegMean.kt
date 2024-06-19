@@ -820,3 +820,8 @@ fun python_choice(from: DoubleArray, size: Int): DoubleArray {
     val n = from.size
     return DoubleArray(size) { from[Random.nextInt(n)] }
 }
+
+// python bool(int), i think
+fun python_bool(v: Int?): Boolean {
+    return if (v == null || v == 0) false else true
+}
