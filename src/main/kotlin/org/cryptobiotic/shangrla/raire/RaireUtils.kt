@@ -1,200 +1,6 @@
 package org.cryptobiotic.shangrla.raire
 
-import org.cryptobiotic.shangrla.core.Cvr
 import kotlin.math.max
-
-
-data class Contest(
-    val name: String,
-    val candidates: List<String>,
-    val winner: String,
-    val tot_ballots: Int,
-    val outcome: IntArray
-)
-
-/*
-fun load_contests_from_txt(path: String) {
-    /*
-        Format:
-        First line is a comma separated list of candidate identifiers, either
-        ending with the winner expressed as ",winner,winner identifier" or
-        addditionally specifying the full outcome with ",order,sequence"
-
-        Second line is party identifiers for each candidate
-        Third line is a separator (eg. -----)
-
-        Each subsequent line has the form:
-        (Comma separated list of candidate identifiers) : Number of ballots
-
-        Each line defines a ballot signature, a preference ordering over
-        candidates, and the number of ballots that have been cast with that
-        signature.
-
-        Use default contest name of "1".
-    */
-
-    contests = []
-    cvrs = {}
-
-    var tot_auditable_ballots = 0
-
-    with(open(path, "r") as data) {
-        val lines = data.readlines()
-
-        val toks = [line.strip() for line in lines[0].strip().split(',')]
-        val windx = toks.index("winner")
-        val winner = toks[windx + 1]
-        val cands = toks[:windx]
-
-        val order = []
-        if ("order" in toks) {
-            order = toks[windx + 2:]
-        }
-
-        val bcntr = 0
-
-        for (l in range(3, len(lines))) {
-            toks = [line.strip() for line in lines[l].strip().split(':')]
-        }
-
-        val num = int(toks[1])
-
-        val prefs = [p.strip() for p in toks[0][1:-1].split(',')]
-
-        tot_auditable_ballots += num
-
-        if (prefs == []) {
-            continue
-        }
-
-        for (i in range(num)) {
-            val ballot = {}
-            for (c in cands) {
-                if (c in prefs) {
-                    idx = prefs.index(c)
-                    ballot[c] = idx
-                }
-
-                cvrs[bcntr] = { 1 : ballot }
-                bcntr += 1
-            }
-        }
-
-        return [Contest(
-            1, cands, winner, this.tot_ballots,
-            order = order
-        )], cvrs
-    }
-}
-
-// Data file in .raire format.
-fun load_contests_from_raire(path: String) {
-    val contests = []
-
-//  A map between ballot id and the relevant CVR.
-    val cvrs = {}
-    with(open(path, "r") as data) {
-        val lines = data.readlines()
-
-//  Total number of contests described in data file
-        val ncontests = int(lines[0])
-
-//  Map between contest id and number of ballots involving that contest
-        val num_ballots = {}
-
-//  Map between contest id and the candidates & winner of that contest.
-        val contest_info = {}
-
-        for (i in range(ncontests)) {
-            toks = [line.strip() for line in lines[1 + i].strip().split(',')]
-        }
-
-//  Get contest id and number of candidates in that contest
-        val cid = toks[1]
-        val ncands = int(toks[2])
-
-//  Get list of candidate identifiers
-        val cands = []
-
-        for (j in range(ncands)) {
-            cands.append(toks[3 + j])
-        }
-
-        val windx = toks.index("winner")
-        val winner = toks[windx + 1]
-
-        var informal = 0
-        var inf_index = null
-        if ("informal" in toks) {
-            inf_index = toks.index("informal")
-            informal = int(toks[inf_index + 1])
-        }
-
-        val order = []
-        if ("order" in toks) {
-            order = toks[windx + 2:inf_index] if inf_index != null  else
-            toks[windx + 2:]
-        }
-
-        contest_info[cid] = (cands, winner, order)
-        num_ballots[cid] = informal
-
-        for (l in range(ncontests + 1, len(lines))) {
-            toks = [line.strip() for line in lines[l].strip().split(',')]
-
-
-            val cid = toks[0]
-            val bid = toks[1]
-            val prefs = toks[2:]
-
-            val ballot = {}
-            for (c in contest_info[cid][0]) {
-                if (c in prefs) {
-                    idx = prefs.index(c)
-                    ballot[c] = idx
-                }
-            }
-            num_ballots[cid] += 1
-
-            if (!bid in cvrs) {
-                cvrs[bid] = { cid: ballot }
-            } else {
-                cvrs[bid][cid] = ballot
-            }
-        }
-
-        for (cid, (cands, winner, order) in contest_info.items()) {
-        con = Contest(cid, cands, winner, num_ballots[cid], order = order)
-        contests.append(con)
-    }
-    }
-
-    return Pair(contests, cvrs)
-}
-
-fun index_of(cand, list_of_cand) {
-    /*
-    Returns position of given candidate 'cand' in the list of candidates
-    'list_of_cand'. Returns -1 if 'cand' is not in the given list.
-
-    Input:
-    cand : string       - Identifier of candidate we are looking for
-    list_of_cand : list - List of candidate identifiers
-
-    Output:
-    Index (starting at 0) of 'cand' in 'list_of_cand', and -1 if
-    'cand' is not in 'list_of_cand'.
-    */
-    for (i in range(len(list_of_cand))) {
-        if (list_of_cand[i] == cand) {
-            return i
-        }
-    }
-
-    return -1
-}
-
- */
 
 fun ranking(cand: String, ballot: Map<String, Int>): Int {
     /*
@@ -208,7 +14,6 @@ fun ranking(cand: String, ballot: Map<String, Int>): Int {
     */
     return ballot[cand] ?: -1
 }
-
 
 fun vote_for_cand(cand: String, eliminated: List<String>, ballot: Map<String, Int>): Int {
     /*
@@ -240,319 +45,6 @@ fun vote_for_cand(cand: String, eliminated: List<String>, ballot: Map<String, In
 
     return 1
 }
-
-
-open class RaireAssertion(val contest_name: String, val winner: String, val loser: String): Comparable<RaireAssertion> {
-    /*
-        Initializes a RAIRE assertion involving a comparison between
-        the tallies of a candidate labelled 'winner' and a candidate
-        labelled 'loser'. This assertion 'asserts' that the tally of
-        the winner is larger than the tally of the loser in some context.
-
-        Each assertion will have an estimated 'difficulty' related to
-        the anticipated number of ballot checks required to audit it.
-
-        Each assertion will have a margin defined as the difference in
-        tallies ascribed to 'winner' and 'loser'
-        */
-
-    var votes_for_winner = 0
-    var votes_for_loser = 0
-
-    var margin = -1
-    var difficulty = Double.POSITIVE_INFINITY
-
-    val rules_out = mutableSetOf<RaireAssertion>()
-
-    open fun is_vote_for_winner(cvr: Cvr): Int {
-        /*
-        Input:
-            cvr - cast vote record
-
-        Output:
-            Returns 1 if the given cvr represents a vote for the assertions
-            winner, and 0 otherwise.
-        */
-        return 0 // TODO
-    }
-
-    open fun is_vote_for_loser(cvr: Cvr): Int {
-        /*
-        Input:
-            cvr - cast vote record
-
-        Output:
-            Returns 1 if the given cvr represents a vote for the assertions
-            loser, and 0 otherwise.
-        */
-        return 0 // TODO
-    }
-
-    open fun subsumes(other: RaireAssertion): Boolean {
-        /*
-        Returns true if this assertion 'subsumes' the input assertion 'other'.
-        An assertion 'A' subsumes assertion 'B' if the alternate outcomes
-        ruled out by 'B' is a subset of those ruled out by 'A'. If we include
-        'A' in an audit, we don't need to include 'B'.
-
-        Input:
-        other : RaireAssertion   - Assertion 'B'
-
-        Output:
-        Returns true if this assertion subsumes assertion 'other'.
-        */
-        return true // TODO
-    }
-
-    open fun same_as(other: RaireAssertion): Boolean {
-        /*
-        Returns true  if this assertion is equal to 'other' (i.e., they
-        are the same assertion), and false  otherwise.
-        */
-        return true // TODO
-    }
-
-    /*  Assertions are ordered in terms of how many alternate outcomes that they are able to rule out.
-    fun __lt__(other: RaireAssertion) {
-        val self_rule_out = if (!this.rules_out) -1 else min([len(ro) for ro in this.rules_out])
-
-        other_rule_out = -1 if not other . rules_out else
-        min([len(ro) for ro in other.rules_out])
-
-        return self_rule_out < other_rule_out
-    }
-
-    fun __gt__(other: RaireAssertion) {
-        self_rule_out = -1 if not self . rules_out else
-        min([len(ro) for ro in this.rules_out])
-
-        other_rule_out = -1 if not other . rules_out else
-        min([len(ro) for ro in other.rules_out])
-
-        return self_rule_out > other_rule_out
-    }
-
-     */
-
-    open fun to_str(): String {
-        return "TODO"
-    }
-
-    override fun compareTo(other: RaireAssertion): Int {
-        //         val self_rule_out = if (!this.rules_out) -1 else min([len(ro) for ro in this.rules_out])
-        val self_rule_out = if (this.rules_out.isEmpty()) -1 else 0 // this.rules_out.map { it.size }.min() TODO
-        val other_rule_out = if (other.rules_out.isEmpty()) -1 else 0 // other.rules_out.map { it.size }.min()
-
-        return self_rule_out - other_rule_out
-    }
-}
-
-class NEBAssertion(contest_name: String, winner: String, loser: String) : RaireAssertion(contest_name, winner, loser) {
-
-    /*
-    A Not-Eliminated-Before (NEB) assertion between a candidate 'winner' and
-    a candidate 'loser' compares the minimum possible tally 'winner' could
-    have (their first preference tally) with the maximum possible tally
-    candidate 'loser' could have while 'winner' is still standing.
-
-    We give 'winner' only those votes that rank 'winner' first.
-
-    We give 'loser' ALL votes in which 'loser' appears in the ranking and
-    'winner' does not, or 'loser' is ranked higher than 'winner'.
-
-    This assertion "asserts" that the tally of 'winner' is larger than the
-    tally of the 'loser'. This means that 'winner' could never be eliminated
-    prior to 'loser'.
-    */
-
-    override fun is_vote_for_winner(cvr: Cvr): Int {
-        if (!cvr.has_contest(this.contest_name)) return 0
-
-        return if (ranking(this.winner, cvr.votes[this.contest_name]!!) == 0) 1 else 0
-    }
-
-    override fun is_vote_for_loser(cvr: Cvr): Int {
-        if (!cvr.has_contest(this.contest_name)) return 0
-
-        val w_idx = ranking(this.winner, cvr.votes[this.contest_name]!!)
-        val l_idx = ranking(this.loser, cvr.votes[this.contest_name]!!)
-
-        // return 1 if l_idx != -1 and (w_idx == -1 or (w_idx != -1 and l_idx < w_idx)) else 0
-        return if (l_idx != -1 && (w_idx == -1 || (w_idx != -1 && l_idx < w_idx))) 1 else 0
-    }
-
-    override fun same_as(other: RaireAssertion): Boolean {
-        return this.contest_name == other.contest_name && this.winner == other.winner
-                && this.loser == other.loser
-    }
-
-    override fun subsumes(other: RaireAssertion): Boolean {
-        /*
-        An NEBAssertion 'A' subsumes an assertion 'other' if:
-        - 'other' is not an NEBAssertion
-        - Both assertions have the same winner & loser
-        - 'other' rules out an outcome with the tail 'Tail' and either the
-        winner of this NEBAssertion assertion appears before the loser in
-        'Tail' or the loser appears and the winner does not.
-        */
-
-        //         if type(other) == NEBAssertion:
-        //            return False
-        //
-        //        if self.winner == other.winner and self.loser == other.loser:
-        //            return True
-        //
-        //        if self.winner == other.winner and not(self.loser in \
-        //            other.eliminated):
-        //            return True
-        //
-        //        elif self.winner in other.eliminated and not(self.loser in \
-        //            other.eliminated):
-        //            return True
-        //
-        //        else:
-        //            # For all outcomes that 'other' is ruling out, this NEB
-        //            # rules them all out.
-        //            for ro in other.rules_out:
-        //                idxw = -1 if not self.winner in ro else ro.index(self.winner)
-        //                idxl = -1 if not self.loser in ro else ro.index(self.loser)
-        //
-        //                if idxw == idxl or (idxl < idxw):
-        //                    return False
-        //
-        //            return True
-        //
-        //        return False
-
-        if (other is NEBAssertion) return false
-
-        if (this.winner == other.winner && this.loser == other.loser) return true
-
-        /* TODO
-        if (this.winner == other.winner && !(this.loser in other.eliminated)) {
-            return true
-
-        } else if (this.winner in other.eliminated && !(this.loser in other.eliminated)) {
-            return true
-
-        } else {
-            //  For all outcomes that 'other' is ruling out, this NEB rules them all out.
-            for (ro in other.rules_out) {
-                val idxw: Int = if (ro.contains(this.winner)) -1 else ro.indexOf(this.winner)
-                val idxl: Int = if (ro.contains(this.loser)) -1 else ro.indexOf(this.loser)
-
-                if (idxw == idxl || (idxl < idxw)) {
-                    return false
-                }
-            }
-            return true
-        } */
-        return false
-    }
-
-    override fun to_str(): String {
-        return "NEB Winner ${this.winner},Loser ${this.loser},diff est ${this.difficulty}"
-    }
-}
-
-// Returns true if listb = some_list + lista
-fun is_suffix(lista: List<Any>, listb: List<Any>): Boolean {
-    val len_lista = lista.size
-    val len_listb = listb.size
-
-    if (len_listb < len_lista) return false
-
-    val ss = listb.subList(len_listb - len_lista, listb.size)
-    return ss == lista
-}
-
-
-class NENAssertion(contest_name: String, winner: String, loser: String, val eliminated: List<String>) :
-    RaireAssertion(contest_name, winner, loser) {
-    /*
-    A Not-Eliminated-Next (NEN) assertion between a candidate 'winner' and
-    a candidate 'loser' compares the tally of the two candidates in the
-    context where a given set of candidates have been eliminated.
-
-    We give 'winner' all votes in which they are preferenced first AFTER
-    the candidates in 'eliminated' are removed from the ranking.
-
-    We give 'loser' all votes in which they are preferenced first AFTER
-    the candidates in 'eliminated' are removed from the ranking.
-
-    This assertion "asserts" that the tally of the 'winner' in this context,
-    where the specified candidates have been eliminated, is larger than that
-    of 'loser'.
-    */
-
-    override fun is_vote_for_winner(cvr: Cvr): Int {
-        if (!cvr.has_contest(this.contest_name)) return 0
-        return vote_for_cand(this.winner, this.eliminated, cvr.votes[this.contest_name]!!)
-    }
-
-    override fun is_vote_for_loser(cvr: Cvr): Int {
-        if (!cvr.has_contest(this.contest_name)) return 0
-        return vote_for_cand(this.loser, this.eliminated, cvr.votes[this.contest_name]!!)
-    }
-
-    override fun same_as(other: RaireAssertion): Boolean {
-        if (other !is NENAssertion) return false
-        return this.contest_name == other.contest_name
-                && this.winner == other.winner
-                && this.loser == other.loser
-                && this.eliminated == other.eliminated
-    }
-
-    override fun subsumes(other: RaireAssertion): Boolean {
-        /*
-        An NENAssertion 'A' subsumes an assertion 'other' if 'other' is
-        not an NEBAssertion, the outcomes that 'A' rules out are suffixes of
-        the outcomes that 'B' rules out.
-        */
-
-        //         if type(other) == NEBAssertion:
-        //            return False
-        //
-        //        other_ro = set(other.rules_out)
-        //
-        //        for ro in self.rules_out:
-        //            other_ro = [o for o in other_ro if not(is_suffix(ro, o))]
-        //
-        //        return other_ro == []
-
-        if (other !is NENAssertion) return false
-
-        // TODO not sure whats correct
-        val other_ro = mutableListOf(other.rules_out)
-
-        /* TODO
-        // for ro in this.rules_out: other_ro = [o for o in other_ro if not(is_suffix(ro, o))]
-        this.rules_out.forEach { ro ->
-            other_ro.forEach { oro ->
-                if (!is_suffix(ro, oro)) other_ro.add(oro)
-            }
-        }
-
-         */
-
-        return other_ro.isEmpty()
-    }
-
-/*
-    override fun to_str() = buildString {
-        append( "NEN Winner= ${winner} Loser= ${loser} Eliminated= ")
-
-        for (cand in this.eliminated:
-        result += ",{}".format(cand)
-
-        result += ",diff est {}, rules out: {}".format(this.difficulty, \
-        this.rules_out)
-        return result
-    }
-
- */
-}
-
 
 class RaireNode(val tail: List<String>) {
     //  Tail of an "imagined" elimination sequence representing the
@@ -699,7 +191,7 @@ class RaireFrontier {
 }
 
 fun find_best_audit(
-    contest: Contest,
+    raireContest: RaireContest,
     ballots: List<Map<String, Int>>,
     neb_matrix: Map<String, MutableMap<String, NEBAssertion?>>,
     node: RaireNode,
@@ -748,7 +240,7 @@ fun find_best_audit(
 
     //  'eliminated' is the list of candidates that are not mentioned in 'tail'.
     //   eliminated = [c for c in contest.candidates if not c in node . tail]
-    val eliminated = contest.candidates.filter { !node.tail.contains(it) }
+    val eliminated = raireContest.candidates.filter { !node.tail.contains(it) }
 
     //  We now look at whether there is a candidate not mentioned in
     //  'tail' (this means they are assumed to be eliminated at some prior
@@ -781,12 +273,12 @@ fun find_best_audit(
             val estimate = asn_func(
                 tally_first_in_tail,
                 tally_later_cand,
-                contest.tot_ballots - (tally_first_in_tail + tally_later_cand),
-                contest.tot_ballots
+                raireContest.tot_ballots - (tally_first_in_tail + tally_later_cand),
+                raireContest.tot_ballots
             )
 
             if (best_asrtn == null || estimate < best_asrtn.difficulty) {
-                val nen = NENAssertion(contest.name, first_in_tail, later_cand, eliminated)
+                val nen = NENAssertion(raireContest.name, first_in_tail, later_cand, eliminated)
 
                 // AFAICT, this is the only place that rules_out is added to?
                 // rules_out has assewrtions, node.tail has Strings
@@ -814,44 +306,44 @@ data class ManageNodeReturn(val audit_not_possible: Boolean, val lowerBound: Dou
 fun manage_node(newn: RaireNode, frontier: RaireFrontier, lowerbound: Double, log: Boolean): ManageNodeReturn {
 
     /*
-Input:
+    Input:
 
-newn: RaireNode    -  A node in the tree of alternate election outcomes that
-has just been created and evaluated, but not yet
-added to our frontier. We need to determine what this
-node's evaluation means for our frontier.
+    newn: RaireNode    -  A node in the tree of alternate election outcomes that
+    has just been created and evaluated, but not yet
+    added to our frontier. We need to determine what this
+    node's evaluation means for our frontier.
 
-frontier           -  Current frontier of our set of alternate outcome
-trees.
+    frontier           -  Current frontier of our set of alternate outcome
+    trees.
 
-lowerbound         -  Current lower bound on audit difficulty.
+    lowerbound         -  Current lower bound on audit difficulty.
 
-log                -  Flag indicating if logging statements should
-be printed during the algorithm.
+    log                -  Flag indicating if logging statements should
+    be printed during the algorithm.
 
-stream             -  Stream to which logging statements should
-be printed.
+    stream             -  Stream to which logging statements should
+    be printed.
 
 
-Output:
+    Output:
 
-Returns a triple:
-audit_not_possible (Boolean), new lower bound, terminus (Boolean)
+    Returns a triple:
+    audit_not_possible (Boolean), new lower bound, terminus (Boolean)
 
-The first element of this triple is a boolean indicating whether or not
-we have established that the audit is not possible. If so, this boolean
-will be true , otherwise it will be false .
+    The first element of this triple is a boolean indicating whether or not
+    we have established that the audit is not possible. If so, this boolean
+    will be true , otherwise it will be false .
 
-The second element indicates the new lower bound on audit difficulty
-as a result of the node's evaluation (note it may not have changed from
-the prior lower bound).
+    The second element indicates the new lower bound on audit difficulty
+    as a result of the node's evaluation (note it may not have changed from
+    the prior lower bound).
 
-The third element indicates whether or not we will need to continue
-exploring children of this node. The boolean 'terminus' will be set to
-true  if we do not need to continue to explore children of this node, and
-false  otherwise.
+    The third element indicates whether or not we will need to continue
+    exploring children of this node. The boolean 'terminus' will be set to
+    true  if we do not need to continue to explore children of this node, and
+    false  otherwise.
 
-*/
+    */
 
     //     if not newn.expandable:
     //        # 'newn' is a leaf.
@@ -923,7 +415,7 @@ false  otherwise.
 
 fun perform_dive(
     node: RaireNode,
-    contest: Contest,
+    raireContest: RaireContest,
     ballots: List<Map<String, Int>>,
     neb_matrix: Map<String, MutableMap<String, NEBAssertion?>>,
     asn_func: EstimatorFn,
@@ -1012,10 +504,10 @@ fun perform_dive(
 //
 //    return perform_dive(newn, contest, ballots, neb_matrix, asn_func, \
 //            next_lowerbound, frontier, log, stream=stream)
-    val ncands = contest.candidates.size
+    val ncands = raireContest.candidates.size
 
     // rem_cands = [c for c in contest.candidates if not c in node.tail]
-    val rem_cands = contest.candidates.filter { !node.tail.contains(it) }
+    val rem_cands = raireContest.candidates.filter { !node.tail.contains(it) }
 
     //  sort rem_cands by position in contest.order if it is defined
     var next_cand = rem_cands[0] // TODO empty ?
@@ -1042,7 +534,7 @@ fun perform_dive(
     //  Assign a 'best ancestor' to the new node.
     newn.best_ancestor = if (node.best_ancestor != null && node.best_ancestor!!.estimate <= node.estimate) node.best_ancestor else node
 
-    find_best_audit(contest, ballots, neb_matrix, newn, asn_func)
+    find_best_audit(raireContest, ballots, neb_matrix, newn, asn_func)
 
     if (log) {
         println("DIVE TESTED ")
@@ -1060,7 +552,7 @@ fun perform_dive(
     }
 
     return perform_dive(
-        newn, contest, ballots, neb_matrix, asn_func,
+        newn, raireContest, ballots, neb_matrix, asn_func,
         next_lowerbound, frontier, log,
     )
 }

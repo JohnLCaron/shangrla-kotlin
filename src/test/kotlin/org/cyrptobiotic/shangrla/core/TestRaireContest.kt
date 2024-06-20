@@ -7,7 +7,7 @@ import org.junit.jupiter.api.Test
 import kotlin.random.Random
 import kotlin.test.assertEquals
 
-class TestContest {
+class TestRaireContest {
 
     val contest_dict = mapOf(
         "Contest 1" to makeCandidates(listOf("Candidate A", "Candidate B"), listOf(0.55, 0.45)),
