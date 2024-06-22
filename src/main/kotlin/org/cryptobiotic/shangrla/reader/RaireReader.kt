@@ -1,10 +1,13 @@
 package org.cryptobiotic.shangrla.reader
 
 import org.cryptobiotic.shangrla.raire.RaireContest
+import org.cryptobiotic.rla.CvrSimple
 import java.io.File
 
 // Data file in .raire format.
-fun load_contests_from_raire(fileName: String): Pair<List<RaireContest>, Map<String, MutableMap<String, MutableMap<String, Int>>>> {
+// first is the list of contests
+// second is a ballot (cvr) which is a map : contestId : candidateId : vote
+fun readRaireBallots(fileName: String): Pair<List<RaireContest>, Map<String, MutableMap<String, MutableMap<String, Int>>>> {
 
 //  A map between ballot id and the relevant CVR.
     val lines = File(fileName).bufferedReader().readLines()
@@ -108,3 +111,45 @@ fun load_contests_from_raire(fileName: String): Pair<List<RaireContest>, Map<Str
 }
 
 data class ContestInfo(val candidates: List<String>, val winner: String, val order: List<Int>)
+
+fun showRaireBallots(
+    raireBallots: Pair<List<RaireContest>, Map<String, MutableMap<String, MutableMap<String, Int>>>>,
+    limit: Int = Integer.MAX_VALUE
+) {
+    val (raireContests, ballots) = raireBallots
+    println("RaireContests ${raireContests}")
+    println("Cvrs Records")
+
+    // Map<String, MutableMap<String, MutableMap<String, Int>>> ballotId: contestId : candidateId : count
+    var ballotIter = ballots.entries.iterator()
+    for (idx in 0..limit) {
+        if (!ballotIter.hasNext()) break
+        val (ballotId, cvr) = ballotIter.next()
+
+        println(buildString {
+            append(" Ballot '$ballotId'= ")
+            for ((contId, mm2) in cvr) {
+                append("Contest '$contId': ")
+                for ((candId, pref) in mm2) {
+                    append("'$candId':$pref, ")
+                }
+            }
+        })
+    }
+    if (ballotIter.hasNext()) println(" ...")
+}
+
+fun makeCvrsFromRaireBallots(
+    ballots: Map<String, MutableMap<String, MutableMap<String, Int>>>,
+    limit: Int = Integer.MAX_VALUE
+): List<CvrSimple> {
+    val result = mutableListOf<CvrSimple>()
+    // Map<String, MutableMap<String, MutableMap<String, Int>>> ballotId: contestId : candidateId : count
+    var ballotIter = ballots.entries.iterator()
+    for (idx in 0..limit) {
+        if (!ballotIter.hasNext()) break
+        val (ballotId, cvr) = ballotIter.next()
+        result.add(CvrSimple(ballotId, cvr))
+    }
+    return result
+}

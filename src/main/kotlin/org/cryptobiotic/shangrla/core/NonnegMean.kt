@@ -713,6 +713,14 @@ class NonnegMean (
     }
 }
 
+// def arange(start=None, *args, **kwargs):
+// arange([start,] stop[, step,], dtype=None, *, like=None)
+// Return evenly spaced values within a given interval.
+fun numpy_arange(start: Int, stop: Int, step: Int): IntArray {
+    var size = (stop - start) / step
+    if (step * size != (stop - start)) size++
+    return IntArray(size) { start + step * it}
+}
 
 // Return the cumulative product of elements
 fun numpy_cumprod(a: DoubleArray) : DoubleArray {

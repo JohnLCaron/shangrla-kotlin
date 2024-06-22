@@ -448,15 +448,6 @@ data class Assertion(
     }
 
 
-    // def arange(start=None, *args, **kwargs):
-    // arange([start,] stop[, step,], dtype=None, *, like=None)
-    // Return evenly spaced values within a given interval.
-    fun numpy_arange(start: Int, stop: Int, step: Int): IntArray {
-        var size = (stop - start) / step
-        if (step * size != (stop - start)) size++
-        return IntArray(size) { start + step * it}
-    }
-
     companion object {
         fun interleave_values(n_small: Int, n_med: Int, n_big: Int,
                               small: Double = 0.0, med: Double = 0.5, big: Double = 1.0): DoubleArray {
