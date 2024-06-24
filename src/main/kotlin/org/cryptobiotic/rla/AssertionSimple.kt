@@ -2,7 +2,7 @@ package org.cryptobiotic.rla
 
 import org.cryptobiotic.shangrla.core.*
 import org.cryptobiotic.shangrla.core.numpy_arange
-import org.cryptobiotic.shangrla.core.Assertion.Companion.interleave_values
+import kotlin.math.min
 
 data class AssertionSimple(
     val contest: ContestSimple,
@@ -10,6 +10,7 @@ data class AssertionSimple(
     val winner: String,
     val loser: String,
     var test: NonnegMean,
+
     var margin: Double? = null,
     val p_value: Double? = null,
     val p_history: List<Double>? = null,
@@ -42,14 +43,15 @@ data class AssertionSimple(
         val big = if (this.contest.audit_type == AuditType.POLLING) this.assorter.upper_bound
         else this.make_overstatement(overs = 0.0)
         val small = if (this.contest.audit_type == AuditType.POLLING) 0.0
-        else this.make_overstatement(overs = 0.5)
+                    else this.make_overstatement(overs = 0.5)
+        println("  big = $big small = $small")
+
         val rate_1 = rate1 ?: ((1 - amargin) / 2)   // rate of small values
         var x = DoubleArray(this.test.N) { big } // array N floats, all equal to big
-        println("  big = $big small = $small")
         // println("  x = ${x.contentToString()}")
 
 
-        if (this.contest.audit_type == AuditType.POLLING) {
+     /*   if (this.contest.audit_type == AuditType.POLLING) {
             if (this.contest.choice_function == SocialChoiceFunction.IRV) {
                 throw NotImplementedError("data must be provided to estimate sample sizes for IRV assertions")
             } else { // get tally
@@ -64,10 +66,11 @@ data class AssertionSimple(
                 }
             }
 
-        } else if (this.contest.audit_type == AuditType.CARD_COMPARISON) { // # comparison audit
+        } else */
+        if (this.contest.audit_type == AuditType.CARD_COMPARISON) { // # comparison audit
             //     arange([start,] stop[, step,], dtype=None, *, like=None) : Return evenly spaced values within a given interval.
-            val rate_1_i = if (rate_1 != null) numpy_arange(0, this.test.N, step = (1.0 / rate_1).toInt()) else IntArray(0)
-            val rate_2_i = if (rate2 != null) numpy_arange(0, this.test.N, step = (1.0 / rate2).toInt())  else IntArray(0)
+            val rate_1_i = numpy_arange(0, this.test.N, step = (1.0 / rate_1).toInt())
+            val rate_2_i = if (rate2 != null  && rate2 != 0.0) numpy_arange(0, this.test.N, step = (1.0 / rate2).toInt()) else IntArray(0)
             rate_1_i.forEach { x[it] = small }
             rate_2_i.forEach { x[it] = 0.0 }
         } else {
@@ -87,7 +90,7 @@ data class AssertionSimple(
         val margin = this.margin!!
         val upper_bound = this.assorter.upper_bound
         val con = this.contest
-        val use_style = con.use_style
+        val use_style = true // con.use_style
 
         var d: List<Double>
         var u: Double
@@ -120,6 +123,25 @@ data class AssertionSimple(
                 (2 - this.margin!! / this.assorter.upper_bound)
     }
 
+    fun set_margin_from_cvrs(audit: AuditSimple, cvrs: List<CvrSimple>): AssertionSimple {
+        val use_style = audit.use_styles
+        val amean = this.assorter.mean(cvrs, use_style = use_style)
+        if (amean < .5) {
+            println("assertion $this not satisfied by CVRs: mean value is ${amean}")
+        }
+        this.margin = 2 * amean - 1
+        println("assertion '${this.winner}v${this.loser}' amean=$amean, margin=${this.margin}")
+
+        if (this.contest.audit_type == AuditType.POLLING) {
+            this.test.u = this.assorter.upper_bound
+        } else if (this.contest.audit_type in listOf(AuditType.CARD_COMPARISON, AuditType.ONEAUDIT)) {
+            this.test.u = 2 / (2 - this.margin!! / this.assorter.upper_bound)
+        } else {
+            throw NotImplementedError("audit type {this.contest.audit_type} not supported")
+        }
+        return this
+    }
+
     override fun toString(): String {
         return "AssertionSimple(contest=${contest.id}, upper_bound=${assorter.upper_bound}, winner='$winner', loser='$loser', " +
                 "margin=$margin, p_value=$p_value, p_history=$p_history, proved=$proved, sample_size=$sample_size)"
@@ -130,18 +152,11 @@ data class AssertionSimple(
 fun make_all_assertions(contests: List<ContestSimple>) {
     for (contest in contests) {
         val scf = contest.choice_function
-        val winrs = contest.winners
-        val losrs = contest.candidates.filter { !winrs.contains(it) }
-        val test = contest.testFn
-        val estim = contest.estimFn
-        val bet = contest.betFn
+        val losers = contest.candidates.filter { !contest.winners.contains(it) }
         if (scf == SocialChoiceFunction.PLURALITY) {
-            contest.assertions.putAll( // TODO mutable state
-                make_plurality_assertions(
-                    contest = contest, winner = winrs, loser = losrs,
-                    test = test, estim = estim, bet = contest.betFn
-                )
-            )
+            contest.assertions = // TODO mutable state
+                make_plurality_assertions(contest = contest, winners = contest.winners, losers = losers)
+
         /* }
             if (scf == SocialChoiceFunction.SUPERMAJORITY) {
             contest.assertions.putAll(
@@ -166,20 +181,13 @@ fun make_all_assertions(contests: List<ContestSimple>) {
     }
 }
 
-fun make_plurality_assertions(contest: ContestSimple, winner: List<String>, loser: List<String>,
-                              test: TestFn? = null, estim: EstimatorFn? = null, bet: BetFn? = null): Map<String, AssertionSimple> {
+fun make_plurality_assertions(contest: ContestSimple, winners: List<String>, losers: List<String>): Map<String, AssertionSimple> {
 
     val assertions = mutableMapOf<String, AssertionSimple>()
-    val test = test ?: contest.testFn
-    val estim = estim ?: contest.estimFn
-    val bet = bet ?: contest.betFn
 
-    for (winr in winner) {
-        for (losr in loser) {
+    for (winr in winners) {
+        for (losr in losers) {
             val wl_pair = winr + " v " + losr
-            val _test = NonnegMean(
-                u = 1.0, N = contest.ncards, t = .5,
-                testFnOverride = test, estimFnOverride = estim, betFnOverride = bet, gOverride = contest.g)
 
             assertions[wl_pair] = AssertionSimple(
                 contest,
@@ -187,16 +195,45 @@ fun make_plurality_assertions(contest: ContestSimple, winner: List<String>, lose
                 loser = losr,
                 assorter = AssorterFn(
                     contest = contest,
+
+// (CVR.as_vote(c.get_vote_for(contest.id, winr)) - CVR.as_vote(c.get_vote_for(contest.id, losr)) + 1 ) / 2,
+// CVR.as_vote: def as_vote(cls, v) -> int:
+//        return int(bool(v))
+
                     assort =  { cvr: CvrSimple ->
                         val w = cvr.get_vote_for(contest.id, winr)
                         val l = cvr.get_vote_for(contest.id, losr)
                         val calc = (w - l + 1) * 0.5
-                        calc},
+                        calc },
                     upper_bound = 1.0,
                 ),
-                test = _test)
+                test = contest.getTestFn(),
+            )
         }
     }
 
     return assertions
+}
+
+fun set_all_margins_from_cvrs(audit: AuditSimple, contests: List<ContestSimple>, cvr_list: List<CvrSimple>): Double {
+
+    var min_margin = Double.POSITIVE_INFINITY
+    for (con in contests) {
+        val margins = mutableMapOf<String, Double>()
+        for ((a,asn) in con.assertions) {
+            asn.set_margin_from_cvrs(audit, cvr_list)
+            val margin = asn.margin!!
+            margins[a] = margin
+            val u = if (con.audit_type == AuditType.POLLING) {
+                asn.assorter.upper_bound
+            } else if (con.audit_type in listOf(AuditType.CARD_COMPARISON, AuditType.ONEAUDIT)) {
+                2 / (2 - margin / asn.assorter.upper_bound)
+            } else {
+                throw Exception ("audit type ${con.audit_type} not implemented")
+            }
+            asn.test.u = u
+            min_margin = min(min_margin, margin)
+        }
+    }
+    return min_margin
 }

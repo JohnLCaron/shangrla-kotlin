@@ -7,23 +7,19 @@ data class AssorterFn(
     // tally_pool_means: mean value of the assorter over each tally_pool of CVRs
 ) {
 
-    //         if use_style and not cvr.has_contest(self.contest.id):
-    //            raise ValueError(
-    //                f"use_style==True but {cvr=} does not contain contest {self.contest.id}"
-    //            )
-    //        # assort the MVR
-    //        mvr_assort = (
-    //            0
-    //            if mvr.phantom or (use_style and not mvr.has_contest(self.contest.id))
-    //            else self.assort(mvr)
-    //        )
-    //        # assort the CVR
-    //        cvr_assort = (
-    //            self.tally_pool_means[cvr.tally_pool]
-    //            if cvr.pool and self.tally_pool_means is not None
-    //            else int(cvr.phantom) / 2 + (1 - int(cvr.phantom)) * self.assort(cvr)
-    //        )
-    //        return cvr_assort - mvr_assort
+    //         Compute the arithmetic mean along the specified axis.
+    fun mean(cvr_list : List<CvrSimple>, use_style: Boolean = true): Double {
+        val count = cvr_list.filter { cvr -> if (use_style) cvr.has_contest(this.contest.id) else true }
+            .count()
+        // println("AssorterFn.mean count = $count")
+
+        cvr_list.subList(0, 11).forEach { println("   ${it.id} ${this.assort( it)}") }
+
+        val result = cvr_list.filter { cvr -> if (use_style) cvr.has_contest(this.contest.id) else true }
+            .map { this.assort( it) }
+            .average()
+        return result
+    }
 
     fun overstatement(mvr : CvrSimple, cvr: CvrSimple, use_style: Boolean = true): Double {
         // sanity check

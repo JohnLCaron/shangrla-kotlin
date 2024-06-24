@@ -1,6 +1,7 @@
 package org.cryptobiotic.shangrla.core
 
-import java.util.Collections.min
+import kotlin.math.min
+
 
 /*
     Parameters
@@ -43,7 +44,7 @@ data class Assertion(
     }
 
     fun min_p(): Double {
-        return min(p_history!!)
+        return java.util.Collections.min(p_history!!)
     }
 
     //    The margin for a list of CVRs.
@@ -146,9 +147,9 @@ data class Assertion(
         }
         this.margin = 2 * amean - 1
         if (this.contest.audit_type == AuditType.POLLING) {
-            this.test = this.test.copy(uOverride = this.assorter.upper_bound)
+            this.test.u = this.assorter.upper_bound
         } else if (this.contest.audit_type in listOf(AuditType.CARD_COMPARISON, AuditType.ONEAUDIT)) {
-            this.test = this.test.copy(uOverride = 2.0 / (2 - this.margin!! / this.assorter.upper_bound))
+            this.test.u = 2 / (2 - this.margin!! / this.assorter.upper_bound)
         } else {
             throw NotImplementedError("audit type {this.contest.audit_type} not supported")
         }
@@ -745,8 +746,7 @@ data class Assertion(
             }
         }
 
-        /*
-        fun set_all_margins_from_cvrs(audit: Audit, contests: List<Contest>, cvr_list: List<CVR>): Double {
+        fun set_all_margins_from_cvrs(audit: Audit, contests: List<Contest>, cvr_list: List<Cvr>): Double {
             /*
             Find all the assorter margins in a set of Assertions. Updates the dict of dicts of assertions
             and the contest dict.
@@ -790,11 +790,11 @@ data class Assertion(
     //        return min_margin
             var min_margin = Double.POSITIVE_INFINITY
             for (con in contests) {
-                con.margins = {}
-                for (asn in con.assertions) {
+                val margins = mutableMapOf<String, Double>()
+                for ((a,asn) in con.assertions) {
                     asn.set_margin_from_cvrs(audit, cvr_list)
-                    val margin = asn.margin
-                    con.margins.update({ a: margin })
+                    val margin = asn.margin!!
+                    margins[a] = margin
                     val u = if (con.audit_type == AuditType.POLLING) {
                         asn.assorter.upper_bound
                     } else if (con.audit_type in listOf(AuditType.CARD_COMPARISON, AuditType.ONEAUDIT)) {
@@ -809,6 +809,7 @@ data class Assertion(
             return min_margin
         }
 
+/*
         fun set_p_values(contests: List<Contest>, mvr_sample: List<CVR>, cvr_sample: List<CVR>?): Double {
             /*
             Find the p-value for every assertion and update assertions & contests accordingly

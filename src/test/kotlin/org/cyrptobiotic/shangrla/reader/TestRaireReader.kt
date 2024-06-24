@@ -2,6 +2,7 @@ package org.cyrptobiotic.shangrla.reader
 
 import org.cryptobiotic.shangrla.reader.readRaireBallots
 import org.cryptobiotic.shangrla.reader.makeCvrsFromRaireBallots
+import org.cryptobiotic.shangrla.reader.makeCvrsFromRaireBallotsPlurality
 import kotlin.test.Test
 
 class TestRaireReader {
@@ -12,6 +13,7 @@ class TestRaireReader {
         val filename = dataDir + "rla/SFDA2019_PrelimReport12VBMJustDASheets.raire"
         testReadRaireBallots(filename, 11)
         testMakeCvrsFromRaireBallots(filename, 11)
+        testMakeCvrsFromRaireBallotsPlurality(filename, 11)
     }
 
     @Test
@@ -22,7 +24,15 @@ class TestRaireReader {
     fun testMakeCvrsFromRaireBallots(filename: String, limit: Int = Integer.MAX_VALUE) {
         val (raireContests, ballots) = readRaireBallots(filename)
         val cvrs = makeCvrsFromRaireBallots(ballots, 11)
-        cvrs.forEach { println(it) }
+        println("testMakeCvrsFromRaireBallots")
+        cvrs.forEach { println(" ${it}") }
+    }
+
+    fun testMakeCvrsFromRaireBallotsPlurality(filename: String, limit: Int = Integer.MAX_VALUE) {
+        val (raireContests, ballots) = readRaireBallots(filename)
+        val cvrs = makeCvrsFromRaireBallotsPlurality(ballots, 11)
+        println("testMakeCvrsFromRaireBallotsPlurality")
+        cvrs.forEach { println(" ${it}") }
     }
 
     fun testReadRaireBallots(filename: String, limit: Int = Integer.MAX_VALUE) {

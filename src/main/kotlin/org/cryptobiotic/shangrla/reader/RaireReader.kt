@@ -73,7 +73,7 @@ fun readRaireBallots(fileName: String): Pair<List<RaireContest>, Map<String, Mut
     //            else:
     //                cvrs[bid][cid] = ballot
 
-    val cvrs = mutableMapOf<String, MutableMap<String, MutableMap<String, Int>>>() //  ballotId -> contestId -> candidate -> Preference rank
+    val ballots = mutableMapOf<String, MutableMap<String, MutableMap<String, Int>>>() //  ballotId -> contestId -> candidate -> Preference rank
     while (lineIndex < lines.size) {
         // 1,1,4,1,2,3
         // 1,2,4,1,2,3
@@ -85,17 +85,17 @@ fun readRaireBallots(fileName: String): Pair<List<RaireContest>, Map<String, Mut
         val bid = toks[1] // ballot id
         val prefs = toks.subList(2, toks.size) // remaining "order"
 
-        val ballot = mutableMapOf<String, Int>() // candidate to preference rank
+        val votes = mutableMapOf<String, Int>() // candidate to preference rank
         for (candidate in contest_info[cid]!!.candidates) {
             if (candidate in prefs) {
-                ballot[candidate] = prefs.indexOf(candidate)
+                votes[candidate] = prefs.indexOf(candidate) + 1  // LOOK: 1 based
             }
         }
         val ncid = num_ballots[cid]!!
         num_ballots[cid] = ncid + 1
 
-        val conBallotMap = cvrs.getOrPut(bid) { mutableMapOf() }
-        conBallotMap[cid] = ballot
+        val conBallotMap = ballots.getOrPut(bid) { mutableMapOf() }
+        conBallotMap[cid] = votes
     }
 
     val raireContests = mutableListOf<RaireContest>()
@@ -107,7 +107,7 @@ fun readRaireBallots(fileName: String): Pair<List<RaireContest>, Map<String, Mut
         }
 
     // TODO translate cvrs into immutables
-    return Pair(raireContests, cvrs)
+    return Pair(raireContests, ballots)
 }
 
 data class ContestInfo(val candidates: List<String>, val winner: String, val order: List<Int>)
@@ -150,6 +150,31 @@ fun makeCvrsFromRaireBallots(
         if (!ballotIter.hasNext()) break
         val (ballotId, cvr) = ballotIter.next()
         result.add(CvrSimple(ballotId, cvr))
+    }
+    return result
+}
+
+// change from IRV to plurality contest, for testing
+fun makeCvrsFromRaireBallotsPlurality(
+    ballots: Map<String, MutableMap<String, MutableMap<String, Int>>>, // ballotId : contestId: candidateId : order
+    limit: Int = Integer.MAX_VALUE
+): List<CvrSimple> {
+    val result = mutableListOf<CvrSimple>()
+    var ballotIter = ballots.entries.iterator()
+    for (idx in 0..limit) {
+        if (!ballotIter.hasNext()) break
+        val (ballotId: String, cvr) = ballotIter.next()
+        val cvrPlurality = mutableMapOf<String, MutableMap<String, Int>>()
+
+        cvr.entries.forEach { (contestId, v1) ->
+            val votesPlurality = mutableMapOf<String, Int>()
+            v1.forEach { (candId, vote) ->
+                if (vote == 1) votesPlurality[candId] = 1
+            }
+            cvrPlurality[contestId] = votesPlurality
+        }
+
+        result.add(CvrSimple(ballotId, cvrPlurality))
     }
     return result
 }

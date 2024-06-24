@@ -48,7 +48,7 @@ class TestAssertion {
             candidates = listOf("Alice", "Bob", "Candy"),
             reported_winners = listOf("Alice"),
             audit_type = AuditType.CARD_COMPARISON,
-            estimFn = { x -> doubleArrayOf(NonnegMean().optimal_comparison(0.2)) },
+            estimFn = { x -> NonnegMean().optimal_comparison(0.2) },
         )
 
         // assertion without a margin

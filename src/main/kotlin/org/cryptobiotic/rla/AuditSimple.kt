@@ -75,77 +75,25 @@ data class AuditSimple(
     val seed: Int = 1234567890,
     val sim_seed: Int = 314159265,
     val quantile: Double = 0.8,
-    val error_rate_1: Double = 0.0,
-    val error_rate_2: Double = 0.0,
+    val error_rate_1: Double = 0.001,
+    val error_rate_2: Double = 0.00,
     val reps: Int = 100,
     val use_styles: Boolean = true,
 ) {
 
     fun find_sample_size(
-        contests: Map<String, ContestSimple>,
-        cvrs: List<CvrSimple>?,
-        mvr_sample: List<CvrSimple>,
-        cvr_sample: List<CvrSimple>
+        contests: List<ContestSimple>,
+        cvrs: List<CvrSimple>? = null,
+        mvr_sample: List<CvrSimple> = emptyList(),
+        cvr_sample: List<CvrSimple> = emptyList(),
     ): Int {
-        /*
-        Estimate sample size for each contest && overall to allow the audit to complete.
-        Uses simulations. For speed, uses the numpy.r&&om Mersenne Twister instead of cryptor&&om, a higher-quality
-        PRNG used to select the actual audit sample.
-
-        Parameters
-        ----------
-        contests: dict of dicts; the contest data structure. outer keys are contest identifiers; inner keys are assertions
-            TODO wrong, this is now just dict of Contests
-        cvrs: list of CVR objects; the full set of CVRs
-        mvr_sample: list of CVR objects; manually ascertained votes
-        cvr_sample: list of CVR objects; CVRs corresponding to the cards that were manually inspected
-
-        Returns
-        -------
-        new_size: int
-        new sample size
-
-        Side effects
-        ------------
-        sets c.sample_size for each Contest in contests
-        if use_style, sets cvr.p for each CVR
-        */
-        //         if len(self.strata) > 1:
-        //            raise NotImplementedError('Stratified audits are not currently implemented.')
-        //        stratum = next(iter(self.strata.values())) # the only stratum
-        //        if stratum.use_style and cvrs is None:
-        //            raise ValueError("stratum.use_style==True but cvrs were not provided.")
-        //        # unless style information is being used, the sample size is the same for every contest.
-        //        old = (0 if stratum.use_style
-        //               else len(mvr_sample))
-        //        old_sizes = {c:old for c in contests.keys()}
-
-
         // unless style information is being used, the sample size is the same for every contest.
         val old = if (this.use_styles) 0 else mvr_sample.size
         val old_sizes: MutableMap<String, Int> =
-            contests.keys.associate { it to old }.toMutableMap()  // old_sizes = {c:old for c in contests.keys()}
+            contests.associate { it.id to old }.toMutableMap()  // old_sizes = {c:old for c in contests.keys()}
 
-//        for c, con in contests.items():
-//            if stratum.use_style:
-//                old_sizes[c] = np.sum(np.array([cvr.sampled for cvr in cvrs if cvr.has_contest(c)]))
-//            new_size = 0
-//            for a, asn in con.assertions.items():
-//                if not asn.proved:
-//                    if mvr_sample is not None: # use MVRs to estimate the next sample size. Set `prefix=True` to use data
-//                        data, u =  asn.mvrs_to_data(mvr_sample, cvr_sample)
-//                        new_size = max(new_size, asn.find_sample_size(data=data, prefix=True,
-//                                                                  reps=self.reps, quantile=self.quantile,
-//                                                                  seed=self.sim_seed))
-//                    else:
-//                        data=None
-//                        new_size = max(new_size, asn.find_sample_size(data=data, rate_1=self.error_rate_1,
-//                                                                  rate_2=self.error_rate_2,
-//                                                                  reps=self.reps, quantile=self.quantile,
-//                                                                  seed=self.sim_seed))
-//            con.sample_size = new_size
-
-        for ((contestId, contest) in contests) {
+        for (contest in contests) {
+            val contestId = contest.id
             if (this.use_styles) {
                 requireNotNull(cvrs)
                 // old_sizes[c] = np.sum(np.array([cvr.sampled for cvr in cvrs if cvr.has_contest(c)]))
@@ -155,7 +103,7 @@ data class AuditSimple(
             var new_size = 0
             for ((_, asn) in contest.assertions) {
                 if (!asn.proved) {
-                    if (mvr_sample != null) { // use MVRs to estimate the next sample size. Set `prefix=True` to use data
+                    if (mvr_sample.isNotEmpty()) { // use MVRs to estimate the next sample size. Set `prefix=True` to use data
                         val (data, _) = asn.mvrs_to_data(mvr_sample, cvr_sample)
                         new_size = max(
                             new_size,
@@ -165,34 +113,20 @@ data class AuditSimple(
                                 seed = this.sim_seed
                             )
                         )
-                    }
-                } else {
-                    new_size = max(
-                        new_size, asn.find_sample_size(
-                            data = null, rate1 = this.error_rate_1,
-                            rate2 = this.error_rate_2,
-                            reps = this.reps, quantile = this.quantile,
-                            seed = this.sim_seed
+                    } else {
+                        new_size = max(
+                            new_size, asn.find_sample_size(
+                                data = null, rate1 = this.error_rate_1,
+                                rate2 = this.error_rate_2,
+                                reps = this.reps, quantile = this.quantile,
+                                seed = this.sim_seed
+                            )
                         )
-                    )
+                    }
                 }
                 contest.sample_size = new_size
             }
         }
-
-//        if stratum.use_style:
-//            for cvr in cvrs:
-//                if cvr.sampled:
-//                    cvr.p=1
-//                else:
-//                    cvr.p=0
-//                    for c, con in contests.items():
-//                        if cvr.has_contest(c) and not cvr.sampled:
-//                            cvr.p = max(con.sample_size/(con.cards - old_sizes[c]), cvr.p)
-//            total_size = math.ceil(np.sum([x.p for x in cvrs if not x.phantom]))
-//        else:
-//            total_size = np.max(np.array([con.sample_size for con in contests.values()]))
-//        return total_size
 
         // TODO why are we setting p here ??
         var total_size: Int
@@ -203,10 +137,10 @@ data class AuditSimple(
                     cvr.p = 1.0
                 } else {
                     cvr.p = 0.0
-                    for ((c, con) in contests) {
-                        if (cvr.has_contest(c) && !cvr.sampled) {
-                            val p1 = con.sample_size!! / (con.ncards - old_sizes[c]!!)
-                            cvr.p = max(p1.toDouble(), cvr.p!!) // TODO nullability
+                    for (con in contests) {
+                        if (cvr.has_contest(con.id) && !cvr.sampled) {
+                            val p1 = con.sample_size!! / (con.ncards - old_sizes[con.id]!!)
+                            cvr.p = max(p1.toDouble(), cvr.p) // TODO nullability
                         }
                     }
                 }
@@ -216,25 +150,29 @@ data class AuditSimple(
             total_size = ceil(summ).toInt()
         } else {
             // total_size = np.max(np.array([con.sample_size for con in contests.values()]))
-            total_size = contests.values.map { it.sample_size!! }.max()
+            total_size = contests.map { it.sample_size!! }.max()
         }
         return total_size
     }
-}
 
-//        'seed':           12345678901234567890,
-//         'sim_seed':       314159265,
-//         'cvr_file':       '/Users/amanda/Downloads/oc_cvrs.zip',
-//         #'cvr_file':       '/Users/Jake/Desktop/oc_cvrs.zip',
-//         #'manifest_file':  'data/OC_mock_manifest_detailed.xlsx',
-//         'manifest_file': 'data/OC_full_manifest.xlsx',
-//         #'manifest_file': 'tests/data/Hart_manifest.xlsx',
-//         'sample_file':    '',
-//         'mvr_file':       '',
-//         'log_file':       'data/OC_example_log.json',
-//         'quantile':       0.8,
-//         'error_rate_1': 0,
-//         'error_rate_2': 0,
-//         #'error_rate_1':   0.001,
-//         #'error_rate_2':   0.0001,
-//         'reps':           100,
+    fun check_audit_parameters(contests: List<ContestSimple>) {
+        require(this.error_rate_1 >= 0) { "expected rate of 1-vote errors must be nonnegative" }
+        require(this.error_rate_2 >= 0) { "expected rate of 2-vote errors must be nonnegative" }
+        for (con in contests) {
+            require(con.risk_limit > 0) { "risk limit {con.risk_limit} negative in contest {c}" }
+            require(con.risk_limit <= .5) { "risk limit {con.risk_limit} exceeds 1/2 in contest {c}" }
+            // require(con.choice_function in Contest.SOCIAL_CHOICE_FUNCTION.SOCIAL_CHOICE_FUNCTIONS) { "unsupported choice function {con.choice_function} in contest {c}" }
+            require(con.n_winners <= con.candidates.size) { "more winners than candidates in contest {c}" }
+            require(con.winners.size == con.n_winners) { "number of reported winners does not equal n_winners in contest {c}" }
+            for (w in con.winners) {
+                require(con.candidates.contains(w)) { "reported winner {w} is not a candidate in contest {c}" }
+            }
+            if (con.choice_function in listOf(SocialChoiceFunction.IRV, SocialChoiceFunction.SUPERMAJORITY)) {
+                require(con.n_winners == 1) { "{con.choice_function} can have only 1 winner in contest {c}" }
+                //if (con.choice_function == SocialChoiceFunction.IRV) {
+                //    require(con.assertion_file,) { "IRV contest {c} requires an assertion file" }
+                //}
+            }
+        }
+    }
+}

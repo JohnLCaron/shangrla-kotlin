@@ -19,8 +19,14 @@ data class CvrSimple(
         return votes.values.first()["A"]!! == 1
     }
 
+    //     def get_vote_for(self, contest_id: str, candidate: str):
+    //        return (
+    //            False
+    //            if (contest_id not in self.votes or candidate not in self.votes[contest_id])
+    //            else self.votes[contest_id][candidate]
+    //        )
     fun get_vote_for(contestId: String, candidate: String) : Int {
-        return votes.values.first()[candidate]!!
+        return votes.values.first()[candidate] ?: 0
     }
 
     fun has_contest(contest_id: String): Boolean = votes[contest_id] != null
