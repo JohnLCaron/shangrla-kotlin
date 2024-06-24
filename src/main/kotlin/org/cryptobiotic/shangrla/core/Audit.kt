@@ -5,7 +5,7 @@ import kotlin.math.max
 
 class Stratum(
     id: String? = null,
-    max_cards: Int? = null,
+    val max_cards: Int? = null,
     val use_style: Boolean,
     replacement: Boolean,
     audit_type: AuditType,

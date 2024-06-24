@@ -69,7 +69,7 @@ import kotlin.random.Random
          create CVRs from the RAIRE representation
  */
 class Cvr (
-    val id: String,
+    val id: String,  // aka ballot id?
     var phantom: Boolean,
     val votes : MutableMap<String, MutableMap<String, Int>>, // contest : candidate : vote
     var tally_pool: String? = null,    // what tallying pool of cards does this CVR belong to (used by ONEAudit)? TODO String?

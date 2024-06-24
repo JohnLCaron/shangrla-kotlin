@@ -141,5 +141,79 @@ class Contest(
             }
         }
 
+        // val cvrs : List<Cvr> = emptyList()
+        //val votes: Map<String, Map<String, Int>> = Cvr.tabulate_votes(cvrs)
+        //val styles: Map<Set<String>, Int> = Cvr.tabulate_styles(cvrs)
+        //val cards: Map<String, Int> = Cvr.tabulate_cards_contests(cvrs)
+
+        //         if len(audit.strata) > 1:
+        //            raise NotImplementedError("stratified audits not implemented")
+        //        stratum = next(iter(audit.strata.values()))
+        //        use_style = stratum.use_style
+        //        max_cards = stratum.max_cards
+        //        contest_dict = {}
+        //        for key in votes:
+        //            contest_name = str(key)
+        //            cards_with_contest = cards[key]
+        //            options = np.array(list(votes[key].keys()), dtype="str")
+        //            tallies = np.array(list(votes[key].values()))
+        //
+        //            reported_winner = options[np.argmax(tallies)]
+        //
+        //            contest_dict[contest_name] = {
+        //                "name": contest_name,
+        //                "cards": cards_with_contest if use_style else max_cards,
+        //                "choice_function": Contest.SOCIAL_CHOICE_FUNCTION.PLURALITY,
+        //                "n_winners": 1,
+        //                "risk_limit": 0.05,
+        //                "candidates": list(options),
+        //                "winner": [reported_winner],
+        //                "assertion_file": None,
+        //                "audit_type": Audit.AUDIT_TYPE.CARD_COMPARISON,
+        //                "test": NonnegMean.alpha_mart,
+        //                "estim": NonnegMean.optimal_comparison,
+        //                "bet": NonnegMean.fixed_bet,
+        //            }
+        //        contests = Contest.from_dict_of_dicts(contest_dict)
+        //        return contests
+        fun fromVotes(audit: Audit, votes: Map<String, Map<String, Int>>, cards: Map<String, Int>): List<Contest> {
+            /*
+            Create a contest dict containing all contests in cvr_list.
+            Every contest is single-winner plurality by default, audited by ballot comparison
+            */
+            if (audit.strata.size > 1) {
+                throw NotImplementedError ("stratified audits not implemented")
+            }
+            val stratum = audit.strata.values.first()
+            val use_style = stratum.use_style
+            val max_cards = stratum.max_cards!!
+            val contests = mutableListOf<Contest>()
+
+            for ((key, candidateMap) in votes) {
+                /* ugh
+                val options = np.array(list(votes[key].keys()), dtype = "str")
+                val tallies = np.array(list(votes[key].values()))
+                val reported_winner = options[np.argmax(tallies)]
+                 */
+
+                contests.add( Contest(
+                    id = key,
+                        name= key,
+                        ncards = if (use_style)  cards[key]!! else max_cards, // LOOK ??
+                        choice_function = SocialChoiceFunction.PLURALITY,
+                        n_winners = 1,
+                        risk_limit = 0.05,
+                        candidates = candidateMap.keys.toList(),
+                        reported_winners = emptyList<String>(), // listOf(reported_winner),
+                        //assertion_file = None,
+                        audit_type = AuditType.CARD_COMPARISON,
+                        //test = NonnegMean.alpha_mart,
+                        //estim = NonnegMean.optimal_comparison,
+                        //bet = NonnegMean.fixed_bet,
+                ))
+            }
+            return contests
+        }
+
     }
 }

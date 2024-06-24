@@ -4,12 +4,10 @@ import org.cryptobiotic.shangrla.core.Assertion
 import org.cryptobiotic.shangrla.core.Cvr
 import kotlin.math.max
 
-// import org.cryptobiotic.shangrla.core.Contest
-
 typealias EstimatorFn = (winner: Int, loser: Int, other: Int, total: Int) -> Double // estimate of difficulty
 
 fun compute_raire_assertions(
-    contest: Contest,
+    raireContest: RaireContest,
     cvrs: List<Cvr>,
     winner: String,
     asn_func: EstimatorFn,
@@ -69,7 +67,7 @@ fun compute_raire_assertions(
         an alternate candidate to 'winner' wins, can be ruled out. 
    */
 
-    val ncands = contest.candidates.size
+    val ncands = raireContest.candidates.size
 
 // First look at all of the NEB assertions that could be formed for
 // this contest. We will refer to this matrix when examining the best
@@ -77,7 +75,12 @@ fun compute_raire_assertions(
 
     //     nebs = {c : { d : None for d in contest.candidates}
     //        for c in contest.candidates}
-    //
+
+    val nebs: Map<String, MutableMap<String, NEBAssertion?>> =
+        raireContest.candidates.associate { it to
+            raireContest.candidates.associate{ it to null as NEBAssertion? }
+                .toMutableMap() }.toMap()
+
     //    for c in contest.candidates:
     //        for d in contest.candidates:
     //            if c == d:
@@ -101,14 +104,11 @@ fun compute_raire_assertions(
     //
     //                nebs[c][d] = asrn
 
-    val nebs: Map<String, MutableMap<String, NEBAssertion?>> = contest.candidates.associate { it to
-            contest.candidates.associate{ it to null as NEBAssertion? }.toMutableMap() }.toMap()
-
-    for (c in contest.candidates) {
-        for (d in contest.candidates) {
+    for (c in raireContest.candidates) {
+        for (d in raireContest.candidates) {
             if (c == d) continue
 
-            val asrn = NEBAssertion(contest.name, c, d)
+            val asrn = NEBAssertion(raireContest.name, c, d)
 
             var tally_c = 0
             var tally_d = 0
@@ -120,8 +120,8 @@ fun compute_raire_assertions(
             if (tally_c > tally_d) {
                 asrn.difficulty = asn_func(
                     tally_c, tally_d,
-                    contest.tot_ballots - (tally_c + tally_d),
-                    contest.tot_ballots
+                    raireContest.tot_ballots - (tally_c + tally_d),
+                    raireContest.tot_ballots
                 )
 
                 asrn.votes_for_winner = tally_c
@@ -131,7 +131,6 @@ fun compute_raire_assertions(
             }
         }
     }
-
 
     // The RAIRE algorithm progressively searches through the space of
     // alternate election outcomes, viewing this space as a tree. We store
@@ -143,7 +142,7 @@ fun compute_raire_assertions(
 
     // val ballots = [blt[contest.name] for _, blt in cvrs.items() if contest.name in blt]
     // this is the list of cvrs.votes for this contest, candidateID -> rank
-    val ballots: List<Map<String, Int>> = cvrs.filter{ cvr -> cvr.has_contest(contest.name) }.map { cvr -> cvr.votes[contest.name]!! }
+    val ballots: List<Map<String, Int>> = cvrs.filter{ cvr -> cvr.has_contest(raireContest.name) }.map { cvr -> cvr.votes[raireContest.name]!! }
 
     // This is a running lowerbound on the overall difficulty of the
     // election audit.
@@ -154,16 +153,16 @@ fun compute_raire_assertions(
 
 // Our frontier initially has a node for each alternate election outcome
 // tail of size two. The last candidate in the tail is the ultimate winner.
-    for (c in contest.candidates) {
+    for (c in raireContest.candidates) {
         if (c == winner) continue
 
-        for (d in contest.candidates) {
+        for (d in raireContest.candidates) {
             if (c == d) continue
 
             val newn = RaireNode(listOf(d, c))
             newn.expandable = (ncands > 2)
 
-            find_best_audit(contest, ballots, nebs, newn, asn_func)
+            find_best_audit(raireContest, ballots, nebs, newn, asn_func)
 
             /*
             if (log) {
@@ -172,7 +171,6 @@ fun compute_raire_assertions(
                 if (newn.best_assertion != null) print("   Best audit ", file = stream, end = '')
                 newn.best_assertion.display(stream = stream)
             }
-
              */
 
             frontier.insert_node(newn)
@@ -189,9 +187,7 @@ fun compute_raire_assertions(
         frontier.display(stream = stream)
         print("===============================================", file = stream)
     }
-
      */
-
 
 // -------------------- Find Assertions -----------------------------------
     while (!audit_not_possible) {
@@ -267,7 +263,7 @@ fun compute_raire_assertions(
 
         if (!to_expand.dive_node) {
             val dive_lb =
-                perform_dive(to_expand, contest, ballots, nebs, asn_func, lowerbound, frontier, log)
+                perform_dive(to_expand, raireContest, ballots, nebs, asn_func, lowerbound, frontier, log)
 
             if (dive_lb == Double.POSITIVE_INFINITY) {
                 // The particular branch we dived along cannot be ruled out with an assertion.
@@ -302,7 +298,7 @@ fun compute_raire_assertions(
 
         // Find children of current node, and find the best assertions that
         // could be used to prune those nodes from the tree of alternate outcomes.
-        for (c in contest.candidates) {
+        for (c in raireContest.candidates) {
             if (!(c in to_expand.tail) && !(c in to_expand.explored)) {
                 val newn = RaireNode(listOf(c) + to_expand.tail)
                 newn.expandable = newn.tail.size <= ncands
@@ -317,7 +313,7 @@ fun compute_raire_assertions(
                 newn.best_ancestor = if (bestEstimate != null && bestEstimate <= lowerbound)
                     to_expand.best_ancestor else to_expand
 
-                find_best_audit(contest, ballots, nebs, newn, asn_func)
+                find_best_audit(raireContest, ballots, nebs, newn, asn_func)
 
                 /*
                 if (log) {
@@ -367,12 +363,13 @@ fun compute_raire_assertions(
         var skip = false
         for (assrtn in assertions) {
             if (node.best_assertion != null && node.best_assertion!!.same_as(assrtn)) {
+                // add all the elements of best_assertion.rules_out to assrtn.rules_out
                 assrtn.rules_out.addAll(node.best_assertion!!.rules_out)
                 skip = true
                 break
             }
-            if (!skip && node.best_assertion != null) assertions.add(node.best_assertion!!)
         }
+        if (!skip && node.best_assertion != null) assertions.add(node.best_assertion!!)
     }
 
     // Assertions will be sorted in order of how much of the alternate
@@ -402,7 +399,8 @@ fun compute_raire_assertions(
     if (assertions.isNotEmpty()) {
         val final_audit = mutableListOf(assertions.removeAt(0))
 
-        for (assertion in assertions) {
+        assertions.filter { it is NENAssertion }.forEach {
+            val assertion = it as NENAssertion
             var subsumed = false
             for (fasrtn in final_audit) {
                 if (fasrtn.subsumes(assertion)) {
@@ -426,7 +424,6 @@ fun compute_raire_assertions(
         for (assertion in final_audit) assertion.display(stream = stream)
         print("===============================================", file = stream)
     }
-
      */
 
     return final_audit

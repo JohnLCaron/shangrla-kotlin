@@ -18,6 +18,11 @@ enum class TestFnType {
     WALD_SPRT,
 }
 
+enum class EstimFnType {
+    OPTIMAL,
+    FIXED,
+}
+
 /*
     Tests of the hypothesis that the mean of a population of values in [0, u] is less than or equal to t.
         Several tests are implemented, all ultimately based on martingales or supermartingales:
@@ -34,7 +39,7 @@ enum class TestFnType {
       lead to different heuristics for selecting the parameters.
  */
 class NonnegMean (
-    val u: Double = 1.0,
+    var u: Double = 1.0,        // TODO mutable
     val N: Int = Int.MAX_VALUE, // TODO withReplacement
     val t: Double = 0.5,
     val random_order: Boolean = true,
@@ -42,6 +47,7 @@ class NonnegMean (
     val withReplacement: Boolean = false,
     testFnType : TestFnType? = TestFnType.ALPHA_MART,
     testFnOverride: TestFn? = null,
+    estimFnType: EstimFnType? = null,
     estimFnOverride: EstimatorFn? = null,
     betFnOverride: BetFn? = null,
     etaOverride: Double? = null,
@@ -50,19 +56,27 @@ class NonnegMean (
     val testAlpha: TestFn = { x -> this.alpha_mart(x) }
     val testWald: TestFn = { x -> this.kaplan_wald(x) }
 
+    val estimFixed: EstimatorFn = { x -> this.fixed_alternative_mean(x) }
+    val estimOptimal: EstimatorFn = { x -> this.optimal_comparison() } // TODO pass error_2_rate ?
+
     val test: TestFn = testFnOverride ?: if (testFnType == TestFnType.KAPLAN_WALD) testWald else testAlpha
-    val estim: EstimatorFn = estimFnOverride ?: { x -> this.fixed_alternative_mean(x) }
+    val estim: EstimatorFn = estimFnOverride ?: if (estimFnType == EstimFnType.OPTIMAL) estimOptimal else estimFixed
     val bet: BetFn = betFnOverride ?: { x -> this.fixed_bet(x) }
     val lam = lamOverride ?: 0.5 // initial fraction of fortune to bet TODO allow to be set
     val eta = etaOverride ?: (t + (u - t) / 2)
 
-    fun copy(uOverride: Double) = NonnegMean(
-        u = uOverride,
+    fun copy() = NonnegMean(
+        u = this.u,
         N = this.N,
         t = this.t,
         random_order = this.random_order,
         gOverride = this.gOverride,
         withReplacement = this.withReplacement,
+
+        testFnOverride = this.test,
+        estimFnOverride = this.estim,
+        etaOverride = this.eta,
+        lamOverride = this.lam,
     )
 
     init {
@@ -127,7 +141,10 @@ class NonnegMean (
         //            etaj = self.estim(x)
         //            terms = np.cumprod((x * etaj / m + (u - x) * (u - etaj) / (u - m)) / u)
         val etaj = this.estim(x)
-        val xp = DoubleArray(x.size) { (x[it] * etaj[it] / m [it] + (u - x[it]) * (u - etaj[it]) / (u - m[it])) / u }
+        val xp = if (etaj.size == x.size) DoubleArray(x.size) { (x[it] * etaj[it] / m [it] + (u - x[it]) * (u - etaj[it]) / (u - m[it])) / u }
+                 else if (etaj.size == 1) DoubleArray(x.size) { (x[it] * etaj[0] / m [it] + (u - x[it]) * (u - etaj[0]) / (u - m[it])) / u }
+        else throw RuntimeException("NonnegMean alpha_mart")
+
         val terms = numpy_cumprod(xp)
 
         // terms[m > u] = 0  # true mean is certainly less than hypothesized
@@ -223,13 +240,29 @@ class NonnegMean (
                 upper bound on the population values
         */
         // TODO eta based on ulp
-        //val uulp = (u * ulpm)
-        //val eta = etap ?: uulp
+        //        ulp = np.finfo(float).eps
+        //        uulp = (1 - ulp)
+        //        eta = getattr(self, "eta", u * (1 - np.finfo(float).eps))
+        //        _S, _Stot, _j, m = self.sjm(N, eta, x)
+        //        if (negs := np.sum(m < 0)) > 0:
+        //            warnings.warn(
+        //                f"Implied population mean is negative in {negs} of {len(x)} terms"
+        //            )
+        //        if (pos := np.sum(m > u)) > 0:
+        //            warnings.warn(
+        //                f"Implied population mean is greater than {u=} in {pos} of {len(x)} terms"
+        //            )
+        //        return m
+
         val (_, _, _, m) = this.sjm(N, eta, x)
         val negs = m.filter { it < 0.0 }
-        if (negs.sum() > 0) println("Implied population mean is negative in ${negs} of ${x.size} terms")
+        if (negs.count() > 0) {
+            println("Implied population mean is negative in ${negs.size} of ${x.size} terms")
+        }
         val pos = m.filter { it > u }
-        if (pos.sum() > 0) println("Implied population mean is greater than ${u} in ${pos} of ${x.size} terms")
+        if (pos.count() > 0) {
+            println("Implied population mean is greater than ${u} in ${pos.size} of ${x.size} terms")
+        }
         return m
     }
 
@@ -604,7 +637,7 @@ class NonnegMean (
         return sam_size
     }
 
-    fun optimal_comparison(p2p: Double): Double {
+    fun optimal_comparison(rate_error_2: Double = 1e-4): DoubleArray {
             /*
             The value of eta corresponding to the "bet" that is optimal for ballot-level comparison audits,
             for which overstatement assorters take a small number of possible values and are concentrated
@@ -632,8 +665,11 @@ class NonnegMean (
                 estimated alternative mean to use in alpha
             */
             // TO DO: double check where rate_error_2 is set
-            val p2 = p2p ?: 1e-4 // getattr(self, "rate_error_2", 1e-4)  // rate of 2-vote overstatement errors
-            return (1 - this.u * (1 - p2)) / (2 - 2 * this.u) + this.u * (1 - p2) - 1 / 2
+        if (this.u == 1.0)
+            throw RuntimeException("optimal_comparison: u ${this.u} must be < 1")
+        val p2 = rate_error_2 // getattr(self, "rate_error_2", 1e-4)  // rate of 2-vote overstatement errors
+        val result = (1 - this.u * (1 - p2)) / (2 - 2 * this.u) + this.u * (1 - p2) - .5
+        return doubleArrayOf(result)
         }
 
     companion object {
@@ -713,6 +749,14 @@ class NonnegMean (
     }
 }
 
+// def arange(start=None, *args, **kwargs):
+// arange([start,] stop[, step,], dtype=None, *, like=None)
+// Return evenly spaced values within a given interval.
+fun numpy_arange(start: Int, stop: Int, step: Int): IntArray {
+    var size = (stop - start) / step
+    if (step * size != (stop - start)) size++
+    return IntArray(size) { start + step * it}
+}
 
 // Return the cumulative product of elements
 fun numpy_cumprod(a: DoubleArray) : DoubleArray {
@@ -760,6 +804,7 @@ fun numpy_repeat(a: DoubleArray, nrepeat: Int) : DoubleArray {
 }
 
 // Returns the indices of the maximum values along an axis.
+// TODO what happens if theres a tie? Should return a list
 fun numpy_argmax(a: List<Double>) : Int {
     var max = Double.MIN_VALUE
     var maxIdx = -1
@@ -818,6 +863,8 @@ fun numpy_quantile(a: IntArray, q: Double): Int {
 //                    single value is returned.
 fun python_choice(from: DoubleArray, size: Int): DoubleArray {
     val n = from.size
+    if (n <= 0)
+        println("HEY")
     return DoubleArray(size) { from[Random.nextInt(n)] }
 }
 
