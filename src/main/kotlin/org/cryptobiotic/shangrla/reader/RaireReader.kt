@@ -36,7 +36,7 @@ fun readRaireBallots(fileName: String): Pair<List<RaireContest>, Map<String, Mut
         repeat(ncands) { cands.add(toks[3 + it]) }
 
         val windx = toks.indexOf("winner")
-        val winner = toks[windx + 1]
+        val winner = if (windx >= 0) toks[windx + 1] else "N/A"
 
         val inf_index = toks.indexOf("informal")
         val informal = if (inf_index < 0) 0 else toks[inf_index + 1].toInt()

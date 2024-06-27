@@ -8,7 +8,6 @@ data class RaireContest(
     val outcome: IntArray, // aka order
 )
 
-
 /*
 fun load_contests_from_txt(path: String) {
     /*

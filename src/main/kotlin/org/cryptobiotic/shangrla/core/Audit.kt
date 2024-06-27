@@ -26,9 +26,9 @@ class Audit(
     mvr_file: String? = null,
     log_file: String? = null,
     val quantile: Double,
-    val error_rate_1: Double,
-    val error_rate_2: Double,
-    val reps: Int,
+    val error_rate_1: Double = 0.001,
+    val error_rate_2: Double = 0.00,
+    val reps: Int = 100,
     max_cards: Int? = null,
     val strata: Map<String, Stratum>,
 ) {
@@ -39,9 +39,9 @@ class Audit(
 
     fun find_sample_size(
         contests: Map<String, Contest>,
-        cvrs: List<Cvr>?,
-        mvr_sample: List<Cvr>,
-        cvr_sample: List<Cvr>
+        cvrs: List<Cvr>? = null,
+        mvr_sample: List<Cvr> = emptyList(),
+        cvr_sample: List<Cvr> = emptyList(),
     ): Int {
         /*
         Estimate sample size for each contest && overall to allow the audit to complete.
@@ -119,7 +119,7 @@ class Audit(
             var new_size = 0
             for ((_, asn) in contest.assertions) {
                 if (!asn.proved) {
-                    if (mvr_sample != null) { // use MVRs to estimate the next sample size. Set `prefix=True` to use data
+                    if (mvr_sample.isNotEmpty()) { // use MVRs to estimate the next sample size. Set `prefix=True` to use data
                         val (data, _) = asn.mvrs_to_data(mvr_sample, cvr_sample)
                         new_size = max(
                             new_size,
@@ -167,8 +167,8 @@ class Audit(
                     cvr.p = 0.0
                     for ((c, con) in contests) {
                         if (cvr.has_contest(c) && !cvr.sampled) {
-                            val p1 = con.sample_size!! / (con.ncards - old_sizes[c]!!)
-                            cvr.p = max(p1.toDouble(), cvr.p!!) // TODO nullability
+                            val p1 = con.sample_size!!.toDouble() / (con.ncards - old_sizes[c]!!)
+                            cvr.p = max(p1, cvr.p!!) // TODO nullability
                         }
                     }
                 }

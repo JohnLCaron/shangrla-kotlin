@@ -44,7 +44,7 @@ data class AssertionSimple(
         else this.make_overstatement(overs = 0.0)
         val small = if (this.contest.audit_type == AuditType.POLLING) 0.0
                     else this.make_overstatement(overs = 0.5)
-        println("  big = $big small = $small")
+        // println("  big = $big small = $small")
 
         val rate_1 = rate1 ?: ((1 - amargin) / 2)   // rate of small values
         var x = DoubleArray(this.test.N) { big } // array N floats, all equal to big
@@ -85,6 +85,28 @@ data class AssertionSimple(
         return sample_size
     }
 
+    /*
+        Process mvrs (and, for comparison audits, cvrs) to create data for the assertion"s test
+        and for sample size simulations.
+
+        Creates assorter values for the mvrs, or overstatement assorter values using the mvrs and cvrs,
+        according to whether the audit uses ballot polling or card-level comparison
+
+        The Assertion.margin must be set before calling this function.
+
+        Parameters
+        ----------
+        mvr_sample: corresponding MVRs
+        cvr_sample: sampled CVRs (for comparison audits)
+
+        mvr_sample and cvr_sample should be ordered using CVR.prep_comparison_sample() or CVR.prep_polling_sample()
+        before calling this routine
+
+        Returns
+        -------
+        d: DoubleArray; either assorter values or overstatement assorter values, depending on the audit method
+        u: upper bound for the test
+    */
     fun mvrs_to_data(mvr_sample: List<CvrSimple>, cvr_sample: List<CvrSimple>): Pair<DoubleArray, Double> {
         requireNotNull(this.margin)
         val margin = this.margin!!
@@ -97,7 +119,7 @@ data class AssertionSimple(
         if (con.audit_type in listOf(AuditType.CARD_COMPARISON, AuditType.ONEAUDIT)) {
             require(mvr_sample.size == cvr_sample.size)
             val cvr2: List<Pair<CvrSimple, CvrSimple>> = mvr_sample.zip(cvr_sample)
-            d = cvr2.filter { (mvr, cvr) -> !use_style || (cvr.has_contest(con.id) && cvr.sample_num!! <= con.sample_threshold!!) }
+            d = cvr2.filter { (mvr, cvr) -> !use_style || (cvr.has_contest(con.id) && cvr.sample_num <= con.sample_threshold!!) }
                 .map { (mvr, cvr) -> this.overstatement_assorter(mvr, cvr, use_style) }
             u = 2 / (2 - margin / upper_bound)
         } else if (con.audit_type == AuditType.POLLING) {  // Assume style information is irrelevant
@@ -107,13 +129,14 @@ data class AssertionSimple(
         } else {
             throw NotImplementedError("audit type ${con.audit_type} not implemented")
         }
+        // convert to double array
         val fa = DoubleArray(d.size) { d[it]}
         return Pair(fa, u)
     }
 
     fun make_overstatement(overs: Double, use_style: Boolean = false): Double {
         val result =  (1 - overs / this.assorter.upper_bound) / (2 - this.margin!! / this.assorter.upper_bound)
-        println("make_overstatement = $result this.margin = ${this.margin}")
+        // println("make_overstatement = $result this.margin = ${this.margin}")
         return result
     }
 
@@ -130,7 +153,7 @@ data class AssertionSimple(
             println("assertion $this not satisfied by CVRs: mean value is ${amean}")
         }
         this.margin = 2 * amean - 1
-        println("assertion '${this.winner}v${this.loser}' amean=$amean, margin=${this.margin}")
+        // println("assertion '${this.winner}v${this.loser}' amean=$amean, margin=${this.margin}")
 
         if (this.contest.audit_type == AuditType.POLLING) {
             this.test.u = this.assorter.upper_bound

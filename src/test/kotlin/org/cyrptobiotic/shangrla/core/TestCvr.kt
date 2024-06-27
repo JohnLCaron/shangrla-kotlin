@@ -63,7 +63,7 @@ class TestCvr {
         val cvrs = CvrBuilders()
             .add(id = "1", tally_pool = "1", pool = true)
                 .setContestVotes("1", ContestVotes("AvB", "Alice"), ContestVotes("CvD", "Candy"))
-            .add(id = "2", sample_num = 0.2, p = 0.5, sampled = true)
+            .add(id = "2", sample_num = 2, p = 0.5, sampled = true)
                 .setContestVotes("2", ContestVotes("AvB", "Bob"), ContestVotes("CvD", Vote("Elvis", 2), Vote("Candy", 0)))
             .add(id = "3", tally_pool = "abc")
                 .setContestVotes("3", ContestVotes("EvF", Vote("Bob"), Vote("Edie", 2)), ContestVotes("CvD", Vote("Elvis", 0), Vote("Candy", 1)))
@@ -97,7 +97,7 @@ class TestCvr {
 
         assertTrue(cvrs[0].pool)
         assertEquals("1", cvrs[0].tally_pool)
-        assertEquals(0.2, cvrs[1].sample_num)
+        assertEquals(2, cvrs[1].sample_num)
         assertEquals(0.5, cvrs[1].p)
         assertTrue(cvrs[1].sampled)
         assertEquals("abc", cvrs[2].tally_pool)
@@ -173,7 +173,7 @@ class TestCvr {
     @Test
     fun test_cvr_pool_contests() {
         val cvrbs = CvrBuilders()
-            .add(id = "1", sample_num = 1.0).setContestVotes("1", ContestVotes("AvB"), ContestVotes("CvD", "Candy"))
+            .add(id = "1", sample_num = 1).setContestVotes("1", ContestVotes("AvB"), ContestVotes("CvD", "Candy"))
             .add(id = "2", p = 0.5).setContestVotes("2", ContestVotes("CvD", Vote("Elvis", 1), Vote("Candy", 0)), ContestVotes("EvF"))
             .add(id = "3", tally_pool = "abc", sampled = true).setContestVotes("3", ContestVotes("GvH"))
 

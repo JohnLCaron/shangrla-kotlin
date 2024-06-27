@@ -142,7 +142,7 @@ data class Assertion(
         val stratum = audit.strata.values.first()
         val use_style = stratum.use_style
         val amean = this.assorter.mean(cvr_list, use_style = use_style)
-        if (amean < 1 / 2) {
+        if (amean < .5) {
             println("assertion $this not satisfied by CVRs: mean value is ${amean}")
         }
         this.margin = 2 * amean - 1
@@ -262,7 +262,7 @@ data class Assertion(
         val margin = this.margin!!
         val upper_bound = this.assorter.upper_bound
         val con = this.contest
-        val use_style = con.use_style
+        val use_style = true // con.use_style
 
         var d: List<Double>
         var u: Double
@@ -286,6 +286,7 @@ data class Assertion(
         } else {
             throw NotImplementedError("audit type ${con.audit_type} not implemented")
         }
+        // convert to double array
         val fa = DoubleArray(d.size) { d[it]}
         return Pair(fa, u)
     }
@@ -433,7 +434,7 @@ data class Assertion(
         } else if (this.contest.audit_type == AuditType.CARD_COMPARISON) { // # comparison audit
             //     arange([start,] stop[, step,], dtype=None, *, like=None) : Return evenly spaced values within a given interval.
             val rate_1_i = if (rate_1 != null) numpy_arange(0, this.test.N, step = (1.0 / rate_1).toInt()) else IntArray(0)
-            val rate_2_i = if (rate2 != null) numpy_arange(0, this.test.N, step = (1.0 / rate2).toInt())  else IntArray(0)
+            val rate_2_i = if (rate2 != null && rate2 != 0.0) numpy_arange(0, this.test.N, step = (1.0 / rate2).toInt())  else IntArray(0)
             rate_1_i.forEach { x[it] = small }
             rate_2_i.forEach { x[it] = 0.0 }
         } else {
