@@ -1,4 +1,4 @@
-package org.cyrptobiotic.shangrla.core
+package org.cryptobiotic.shangrla.core
 
 import org.cryptobiotic.shangrla.core.*
 import java.lang.Math.log

@@ -140,8 +140,8 @@ class Audit(
                         )
                     )
                 }
-                contest.sample_size = new_size
             }
+            contest.sample_size = new_size
         }
 
 //        if stratum.use_style:

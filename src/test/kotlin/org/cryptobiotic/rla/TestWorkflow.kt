@@ -4,7 +4,7 @@ import org.cryptobiotic.shangrla.reader.readRaireBallots
 import org.cryptobiotic.shangrla.reader.showRaireBallots
 import org.cryptobiotic.shangrla.reader.makeCvrsFromRaireBallots
 import org.cryptobiotic.shangrla.reader.makeCvrsFromRaireBallotsPlurality
-import org.cyrptobiotic.shangrla.core.AssertionUtils.Companion.check_audit_parameters
+import org.cryptobiotic.shangrla.core.AssertionUtils.Companion.check_audit_parameters
 
 import org.cryptobiotic.shangrla.core.*
 
@@ -80,7 +80,7 @@ class TestWorkflow {
         val sample_size = audit.find_sample_size(contests, cvrs=cvrs)
         println("sample_size = ${sample_size}")
 
-        //CvrSimple.assign_sample_nums(cvrs)
+        CvrSimple.assign_sample_nums(cvrs)
         //val sampled_cvr_indices = CvrSimple.consistent_sampling(cvrs, contests=contests)
 
     }

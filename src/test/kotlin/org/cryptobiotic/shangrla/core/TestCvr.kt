@@ -1,4 +1,4 @@
-package org.cyrptobiotic.shangrla.core
+package org.cryptobiotic.shangrla.core
 
 import org.cryptobiotic.shangrla.core.Cvr
 import kotlin.test.*
@@ -23,7 +23,8 @@ class TestCvr {
     @Test
     fun test_rcv_votefor_cand() {
         val votes = ContestVotes("AvB", Vote("Alice"), Vote("Bob", 2), Vote("Candy", 3),
-            Vote("Dan", 0), Vote("Ross", 4), Vote("Aaron", 5))
+            Vote("Dan", 0), Vote("Ross", 4), Vote("Aaron", 5)
+        )
         val cvr = CvrBuilder("id").addContestVotes(votes).build()
 
         var remaining = listOf("Bob", "Dan", "Aaron", "Candy")
@@ -137,7 +138,8 @@ class TestCvr {
         assertTrue(cvrs[0].update_votes(CvrBuilder("id").addContest("QvR").build())) // new contest added
         assertNotNull(cvrs[1].get_vote_for("CvD", "Elvis"))
         assertFalse(cvrs[0].update_votes(CvrBuilder("id").addVote("CvD", "Dan", 7).build()))
-        assertTrue(cvrs[1].update_votes(CvrBuilder("id")
+        assertTrue(cvrs[1].update_votes(
+            CvrBuilder("id")
             .addContest("QvR")
             .addContestVotes(ContestVotes("CvD", Vote("Dan", 7), Vote("Elvis", 0), Vote("Candy", 1)))
             .build()))
@@ -399,7 +401,8 @@ fun test_tabulate_styles() {
         .add(id = "5",  ContestVotes("city_council", "Doug"))
         .add(id = "6",  ContestVotes("measure_1", "no"))
         .add(id = "7",  ContestVotes("city_council", "Alice"), ContestVotes("measure_1", "yes"),
-            ContestVotes("measure_2", "yes"))
+            ContestVotes("measure_2", "yes")
+        )
         .add(id = "8",  ContestVotes("measure_1", "no"), ContestVotes("measure_2", "yes"))
         .add(id = "9",  ContestVotes("measure_1", "no"), ContestVotes("measure_3", "yes"))
         .build()
@@ -437,7 +440,8 @@ fun test_tabulate_styles() {
             .add(id = "5",  ContestVotes("city_council", Vote("Doug", 1)))
             .add(id = "6",  ContestVotes("measure_1", Vote("no", 1)))
             .add(id = "7",  ContestVotes("city_council", Vote("Alice", 1)), ContestVotes("measure_1", Vote("yes", 1)),
-                ContestVotes("measure_2", Vote("yes", 1)))
+                ContestVotes("measure_2", Vote("yes", 1))
+            )
             .add(id = "8",  ContestVotes("measure_1", "no"), ContestVotes("measure_2", "yes"))
             .add(id = "9",  ContestVotes("measure_1", "no"), ContestVotes("measure_3", "yes"))
             .build()
@@ -482,7 +486,8 @@ fun test_tabulate_styles() {
             .add(id = "5",  ContestVotes("city_council", Vote("Doug", 1)))
             .add(id = "6",  ContestVotes("measure_1", Vote("no", 1)))
             .add(id = "7",  ContestVotes("city_council", Vote("Alice", 1)), ContestVotes("measure_1", Vote("yes", 1)),
-                ContestVotes("measure_2", Vote("yes", 1)))
+                ContestVotes("measure_2", Vote("yes", 1))
+            )
             .add(id = "8",  ContestVotes("measure_1", "no"), ContestVotes("measure_2", "yes"))
             .add(id = "9",  ContestVotes("measure_1", "no"), ContestVotes("measure_3", "yes"))
             .build()

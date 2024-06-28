@@ -1,4 +1,4 @@
-package org.cyrptobiotic.shangrla.core
+package org.cryptobiotic.shangrla.core
 
 import org.cryptobiotic.shangrla.core.AuditType
 import org.cryptobiotic.shangrla.core.Contest
@@ -53,7 +53,8 @@ class TestContests {
             .add(id = "1", ContestVotes("AvB", "Alice"), ContestVotes("CvD", "Candy"))
             .add(id = "2", ContestVotes("AvB", "Bob"), ContestVotes("CvD", Vote("Elvis"), Vote("Candy", 0)))
             .add(id = "3", ContestVotes("EvF",  Vote("Bob"), Vote("Edie", 2)),
-                ContestVotes("CvD",  Vote("Elvis", 0), Vote("Candy")))
+                ContestVotes("CvD",  Vote("Elvis", 0), Vote("Candy"))
+            )
             .add(id = "4", ContestVotes("AvB", "Alice"), ContestVotes("CvD", "Candy"))
             .add(id = "5", ContestVotes("AvB", "Bob"), ContestVotes("CvD", Vote("Elvis"), Vote("Candy", 0)))
             .add(id = "6", ContestVotes("EvF", Vote("Bob", 2), Vote("Edie")), ContestVotes("CvD", Vote("Elvis", 0), Vote("Candy")))

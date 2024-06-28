@@ -1,4 +1,4 @@
-package org.cyrptobiotic.shangrla.reader
+package org.cryptobiotic.shangrla.reader
 
 import org.cryptobiotic.shangrla.reader.readDominionJsonFromFile
 import org.cryptobiotic.shangrla.reader.readDominionJsonFromFileOld

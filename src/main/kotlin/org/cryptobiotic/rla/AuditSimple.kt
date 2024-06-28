@@ -125,8 +125,8 @@ data class AuditSimple(
                         )
                     }
                 }
-                contest.sample_size = new_size
             }
+            contest.sample_size = new_size
         }
 
         //        for c, con in contests.items():

@@ -1,6 +1,5 @@
-package org.cyrptobiotic.shangrla.core
+package org.cryptobiotic.shangrla.core
 
-import org.cryptobiotic.shangrla.core.Cvr
 import kotlin.random.Random
 
 class CvrBuilders {
