@@ -74,7 +74,7 @@ class Cvr (
     val votes : MutableMap<String, MutableMap<String, Int>>, // contest : candidate : vote
     var tally_pool: String? = null,    // what tallying pool of cards does this CVR belong to (used by ONEAudit)? TODO String?
     var pool: Boolean = false,      // pool votes on this CVR within its tally_pool?
-    var sample_num: Double? = null,  // pseudorandom number used for consistent sampling
+    var sample_num: Int? = null,  // pseudorandom number used for consistent sampling
     var p: Double? = null,           // sampling probability
     var sampled: Boolean = false,   // is this CVR in the sample?
 ) {
@@ -528,7 +528,7 @@ class Cvr (
         // Assigns a pseudo-random sample number to each cvr in cvr_list
         fun assign_sample_nums(cvr_list: List<Cvr>) {
              for (cvr in cvr_list) {
-                cvr.sample_num = Random.nextDouble() // TODO SecureRandom ?
+                cvr.sample_num = Random.nextInt() // TODO SecureRandom ?
             }
         }
 

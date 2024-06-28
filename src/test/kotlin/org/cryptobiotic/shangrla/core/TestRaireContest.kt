@@ -1,8 +1,8 @@
-package org.cyrptobiotic.shangrla.core
+package org.cryptobiotic.shangrla.core
 
 import org.cryptobiotic.shangrla.core.*
 import org.cryptobiotic.shangrla.reader.sigfig
-import org.cyrptobiotic.shangrla.core.AssertionUtils.Companion.find_margins
+import org.cryptobiotic.shangrla.core.AssertionUtils.Companion.find_margins
 import org.junit.jupiter.api.Test
 import kotlin.random.Random
 import kotlin.test.assertEquals

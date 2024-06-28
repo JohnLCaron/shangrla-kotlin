@@ -1,4 +1,4 @@
-package org.cyrptobiotic.shangrla.reader
+package org.cryptobiotic.shangrla.reader
 
 import org.cryptobiotic.shangrla.reader.readHartXmlFromFile
 import kotlin.test.*

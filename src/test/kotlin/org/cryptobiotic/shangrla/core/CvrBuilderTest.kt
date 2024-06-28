@@ -1,4 +1,4 @@
-package org.cyrptobiotic.shangrla.core
+package org.cryptobiotic.shangrla.core
 
 import org.junit.jupiter.api.Assertions.assertFalse
 import kotlin.test.Test

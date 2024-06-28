@@ -1,4 +1,4 @@
-package org.cyrptobiotic.shangrla.reader
+package org.cryptobiotic.shangrla.reader
 
 import org.cryptobiotic.shangrla.reader.readRaireBallots
 import org.cryptobiotic.shangrla.reader.makeCvrsFromRaireBallots

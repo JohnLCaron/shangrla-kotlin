@@ -9,6 +9,7 @@ typealias TestFn = (x: DoubleArray) -> Pair<Double, DoubleArray>
 typealias EstimatorFn = (x: DoubleArray) -> DoubleArray
 typealias BetFn = (x: DoubleArray) -> DoubleArray
 
+// Tests of the hypothesis that the mean of a population of values in [0, u] is less than or equal to t.
 enum class TestFnType {
     ALPHA_MART,
     BETTING_MART,
@@ -36,14 +37,14 @@ enum class EstimFnType {
     Many of the tests have versions for sampling with replacement (`N=np.inf`) and for sampling
     without replacement (`N` finite).
     Betting martingales and ALPHA martingales are different parametrizations of the same tests, but
-      lead to different heuristics for selecting the parameters.
+       lead to different heuristics for selecting the parameters.
  */
 class NonnegMean (
     var u: Double = 1.0,        // TODO mutable
     val N: Int = Int.MAX_VALUE, // TODO withReplacement
-    val t: Double = 0.5,
+    val t: Double = 0.5, // TODO is it ever anything other than .5 ??
     val random_order: Boolean = true,
-    val gOverride: Double? = null,
+    val gOverride: Double? = null, // used only in the 3 KAPLAN_* tests.
     val withReplacement: Boolean = false,
     testFnType : TestFnType? = TestFnType.ALPHA_MART,
     testFnOverride: TestFn? = null,
@@ -53,15 +54,19 @@ class NonnegMean (
     etaOverride: Double? = null,
     lamOverride: Double? = null,
 ) {
+    // Tests of the hypothesis that the mean of a population of values in [0, u] is less than or equal to t.
     val testAlpha: TestFn = { x -> this.alpha_mart(x) }
     val testWald: TestFn = { x -> this.kaplan_wald(x) }
+    val test: TestFn = testFnOverride ?: if (testFnType == TestFnType.KAPLAN_WALD) testWald else testAlpha
 
+    // only place this seems to be used is in alpha_mart()
     val estimFixed: EstimatorFn = { x -> this.fixed_alternative_mean(x) }
     val estimOptimal: EstimatorFn = { x -> this.optimal_comparison() } // TODO pass error_2_rate ?
-
-    val test: TestFn = testFnOverride ?: if (testFnType == TestFnType.KAPLAN_WALD) testWald else testAlpha
     val estim: EstimatorFn = estimFnOverride ?: if (estimFnType == EstimFnType.OPTIMAL) estimOptimal else estimFixed
+
+    // only place this seems to be used is in betting_mart()
     val bet: BetFn = betFnOverride ?: { x -> this.fixed_bet(x) }
+
     val lam = lamOverride ?: 0.5 // initial fraction of fortune to bet TODO allow to be set
     val eta = etaOverride ?: (t + (u - t) / 2)
 
@@ -594,6 +599,8 @@ class NonnegMean (
         //            sam_size = int(np.quantile(sams, quantile))
         //        return sam_size
 
+        require (quantile in 0.0..1.0)
+
         val sam_size = if (reps == null) {
             val repeats = ceil(N.toDouble() / x.size).toInt()
             val pop = numpy_repeat(x, repeats) // tile data to make the population
@@ -632,6 +639,7 @@ class NonnegMean (
                 val crossedCount = crossed.filter { it }.count()
                 sams[it] = if (crossedCount == 0) N else (indexFirstTrue(crossed) + 1)
             }
+            sams.sort() // sort in place
             numpy_quantile(sams, quantile)
         }
         return sam_size
@@ -827,16 +835,38 @@ fun numpy_append(pfx: DoubleArray, a: DoubleArray) : DoubleArray {
     return DoubleArray(pfx.size + a.size) { if (it<n) pfx[it] else a[it-n] }
 }
 
-//     Compute the q-th quantile of the data
-//    a : array_like of real numbers
-//        Input array or object that can be converted to an array.
-//    q : array_like of float
-//        Probability or sequence of probabilities for the quantiles to compute.
-//        Values must be between 0 and 1 inclusive.
-//    result: the result corresponds to the quantiles.
-
+// computes the q-th quantile of data along the specified axis.
+// The q-th quantile represents the value below which q percent of the data falls.
 fun numpy_quantile(a: IntArray, q: Double): Int {
-    return a.average().toInt() // TODO
+    // for (i=0, sum=0; i<n; i++) sum += Number[i];
+    //tot = sum;
+    //for (i=0, sum=0; i<n && sum < 0.95*tot; i++) sum += Number[i];
+    //// i is about it
+    val total = a.sum() * q
+    var i = 0
+    var runningTotal = 0
+    while ( runningTotal < total) {
+        runningTotal += a[i++]
+    }
+    return a[i]
+}
+
+// this one assumes you cant change data array
+// https://softwareengineering.stackexchange.com/questions/195652/how-to-calculate-percentile-in-java-without-using-library/453902
+fun numpy_quantile2(data: IntArray, quantile: Double): Int {
+
+    require (quantile in 0.0..1.0)
+    val total = data.sum() * quantile
+
+    val sortedData = data.copyOf() // or sort in place, which changes data
+    sortedData.sort()
+
+    var i = 0
+    var runningTotal = 0
+    while (runningTotal < total) {
+        runningTotal += sortedData[i++]
+    }
+    return sortedData[i]
 }
 
 //     def choice(self, a, size=None, replace=True, p=None): # real signature unknown; restored from __doc__

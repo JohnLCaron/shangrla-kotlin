@@ -1,5 +1,6 @@
 package org.cryptobiotic.shangrla.core
 
+import kotlin.math.max
 import kotlin.math.min
 
 
@@ -33,8 +34,8 @@ data class Assertion(
     val loser: String,
     var test: NonnegMean,
     var margin: Double? = null,
-    val p_value: Double? = null,
-    val p_history: List<Double>? = null,
+    var p_value: Double? = null,
+    var p_history: List<Double>? = null,
     var proved: Boolean = false,
     var sample_size: Int? = null,
     var tally_pool_means: MutableMap<String, Double>? = null,
@@ -142,7 +143,7 @@ data class Assertion(
         val stratum = audit.strata.values.first()
         val use_style = stratum.use_style
         val amean = this.assorter.mean(cvr_list, use_style = use_style)
-        if (amean < 1 / 2) {
+        if (amean < .5) {
             println("assertion $this not satisfied by CVRs: mean value is ${amean}")
         }
         this.margin = 2 * amean - 1
@@ -262,7 +263,7 @@ data class Assertion(
         val margin = this.margin!!
         val upper_bound = this.assorter.upper_bound
         val con = this.contest
-        val use_style = con.use_style
+        val use_style = true // con.use_style
 
         var d: List<Double>
         var u: Double
@@ -286,6 +287,7 @@ data class Assertion(
         } else {
             throw NotImplementedError("audit type ${con.audit_type} not implemented")
         }
+        // convert to double array
         val fa = DoubleArray(d.size) { d[it]}
         return Pair(fa, u)
     }
@@ -433,7 +435,7 @@ data class Assertion(
         } else if (this.contest.audit_type == AuditType.CARD_COMPARISON) { // # comparison audit
             //     arange([start,] stop[, step,], dtype=None, *, like=None) : Return evenly spaced values within a given interval.
             val rate_1_i = if (rate_1 != null) numpy_arange(0, this.test.N, step = (1.0 / rate_1).toInt()) else IntArray(0)
-            val rate_2_i = if (rate2 != null) numpy_arange(0, this.test.N, step = (1.0 / rate2).toInt())  else IntArray(0)
+            val rate_2_i = if (rate2 != null && rate2 != 0.0) numpy_arange(0, this.test.N, step = (1.0 / rate2).toInt())  else IntArray(0)
             rate_1_i.forEach { x[it] = small }
             rate_2_i.forEach { x[it] = 0.0 }
         } else {
@@ -809,8 +811,7 @@ data class Assertion(
             return min_margin
         }
 
-/*
-        fun set_p_values(contests: List<Contest>, mvr_sample: List<CVR>, cvr_sample: List<CVR>?): Double {
+        fun set_p_values(contests: List<Contest>, mvr_sample: List<Cvr>, cvr_sample: List<Cvr>): Double {
             /*
             Find the p-value for every assertion and update assertions & contests accordingly
 
@@ -853,28 +854,24 @@ data class Assertion(
     //            contests[c].max_p = contest_max_p
     //            p_max = np.max([p_max, contests[c].max_p])
     //        return p_max
+
             if (cvr_sample != null) {
                 require(mvr_sample.size == cvr_sample.size) {"unequal numbers of cvrs and mvrs"}
             }
-            var p_max = 0.0f
+            var p_max = 0.0
             for (con in contests) {
-                con.p_values = {}
-                con.proved = {}
-                var contest_max_p = 0
-                for (asn in con.assertions) {
+                for ((_, asn) in con.assertions) {
                     val (d, u) = asn.mvrs_to_data(mvr_sample, cvr_sample)
                     asn.test.u = u       // set upper bound for the test for each assorter
-                    asn.p_value, asn.p_history = asn.test.test(d)
-                    asn.proved = (asn.p_value <= con.risk_limit) or asn.proved
-                    con.p_values.update({ a: asn.p_value })
-                    con.proved.update({ a: asn.proved })
-                    contest_max_p = np.max([contest_max_p, asn.p_value])
+                    val (p_value, p_history) = asn.test.test(d)
+                    asn.p_value = p_value
+                    asn.p_history = p_history.toList()
+                    asn.proved = (p_value <= con.risk_limit) || asn.proved
+                    p_max = max(p_max, p_value)
                 }
-                contests[c].max_p = contest_max_p
-                p_max = np.max([p_max, contests[c].max_p])
             }
             return p_max
         }
-         */
+
     }
 }

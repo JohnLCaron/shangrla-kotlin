@@ -24,7 +24,7 @@ class Contest(
     var ncvrs: Int = 0,
     var ncards: Int = 0,
     var sample_size: Int? = null,
-    var sample_threshold: Double? = null,
+    var sample_threshold: Int? = null,
     val share_to_win: Double = 0.5,
     val tally: MutableMap<String, Int> = mutableMapOf(), // candidate name -> vote count
     val use_style: Boolean = true,

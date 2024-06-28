@@ -81,6 +81,7 @@ data class AuditSimple(
     val use_styles: Boolean = true,
 ) {
 
+    // use_styles or mvr_sample, from previous?
     fun find_sample_size(
         contests: List<ContestSimple>,
         cvrs: List<CvrSimple>? = null,
@@ -124,9 +125,63 @@ data class AuditSimple(
                         )
                     }
                 }
-                contest.sample_size = new_size
             }
+            contest.sample_size = new_size
         }
+
+        //        for c, con in contests.items():
+        //            if stratum.use_style:
+        //                old_sizes[c] = np.sum(
+        //                    np.array([cvr.sampled for cvr in cvrs if cvr.has_contest(c)])
+        //                )
+        //            new_size = 0
+        //            for a, asn in con.assertions.items():
+        //                if not asn.proved:
+        //                    if (
+        //                        mvr_sample is not None
+        //                    ):  # use MVRs to estimate the next sample size. Set `prefix=True` to use data
+        //                        data, u = asn.mvrs_to_data(mvr_sample, cvr_sample)
+        //                        new_size = max(
+        //                            new_size,
+        //                            asn.find_sample_size(
+        //                                data=data,
+        //                                prefix=True,
+        //                                reps=self.reps,
+        //                                quantile=self.quantile,
+        //                                seed=self.sim_seed,
+        //                            ),
+        //                        )
+        //                    else:
+        //                        data = None
+        //                        new_size = max(
+        //                            new_size,
+        //                            asn.find_sample_size(
+        //                                data=data,
+        //                                rate_1=self.error_rate_1,
+        //                                rate_2=self.error_rate_2,
+        //                                reps=self.reps,
+        //                                quantile=self.quantile,
+        //                                seed=self.sim_seed,
+        //                            ),
+        //                        )
+        //            con.sample_size = new_size
+        //        if stratum.use_style:
+        //            for cvr in cvrs:
+        //                if cvr.sampled:
+        //                    cvr.p = 1
+        //                else:
+        //                    cvr.p = 0
+        //                    for c, con in contests.items():
+        //                        if cvr.has_contest(c) and not cvr.sampled:
+        //                            cvr.p = max(
+        //                                con.sample_size / (con.cards - old_sizes[c]), cvr.p
+        //                            )
+        //            total_size = math.ceil(np.sum([x.p for x in cvrs if not x.phantom]))
+        //        else:
+        //            total_size = np.max(
+        //                np.array([con.sample_size for con in contests.values()])
+        //            )
+        //        return total_size
 
         // TODO why are we setting p here ??
         var total_size: Int
@@ -139,14 +194,19 @@ data class AuditSimple(
                     cvr.p = 0.0
                     for (con in contests) {
                         if (cvr.has_contest(con.id) && !cvr.sampled) {
-                            val p1 = con.sample_size!! / (con.ncards - old_sizes[con.id]!!)
-                            cvr.p = max(p1.toDouble(), cvr.p) // TODO nullability
+                            val p1 = con.sample_size!!.toDouble() / (con.ncards - old_sizes[con.id]!!)
+                            cvr.p = max(p1, cvr.p) // TODO nullability
                         }
                     }
                 }
             }
+            // when old_sizes == 0, total_size should be con.sample_size (61); python has roundoff to get 62
             // total_size = ceil(np.sum([x.p for x in cvrs if !x.phantom))
             val summ: Double = cvrs.filter { !it.phantom }.map { it.p!! }.sum()
+            val mul1 = 146663 * 4.159223248012437E-4
+            val mul = 146662 * 4.159223248012437E-4
+            val diff = 61 - mul
+            val cee = ceil(summ)
             total_size = ceil(summ).toInt()
         } else {
             // total_size = np.max(np.array([con.sample_size for con in contests.values()]))

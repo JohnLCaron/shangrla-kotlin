@@ -1,12 +1,11 @@
-package org.cyrptobiotic.shangrla.core
+package org.cryptobiotic.shangrla.core
 
-import org.cryptobiotic.shangrla.core.Cvr
 import kotlin.random.Random
 
 class CvrBuilders {
     val builders = mutableListOf<CvrBuilder>()
 
-    fun add(id: String, tally_pool: String? = null, pool: Boolean = false, sampled: Boolean = false, sample_num: Double? = null, p: Double? = null): CvrBuilders {
+    fun add(id: String, tally_pool: String? = null, pool: Boolean = false, sampled: Boolean = false, sample_num: Int? = null, p: Double? = null): CvrBuilders {
         val cb = CvrBuilder(id)
         cb.tally_pool = tally_pool
         cb.pool = pool
@@ -112,7 +111,7 @@ class CvrBuilder(
     var pool: Boolean = false
     var p: Double? = null
     var sampled: Boolean? = null
-    var sample_num: Double? = null
+    var sample_num: Int? = null
 
     fun setTallyPool(pool: String): CvrBuilder {
         this.tally_pool = pool

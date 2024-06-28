@@ -1,4 +1,4 @@
-package org.cyrptobiotic.shangrla.core
+package org.cryptobiotic.shangrla.core
 
 import org.cryptobiotic.shangrla.core.Cvr
 import org.cryptobiotic.shangrla.core.Contest
@@ -121,7 +121,7 @@ class AssertionUtils {
                 for (a in contest.assertions.values) {
                     // find mean of the assertion for the CVRs
                     val amean = a.assorter.mean(cvr_list, use_style = use_style)
-                    if (amean < 1 / 2) {
+                    if (amean < .5) {
                         println("assertion ${a} not satisfied by CVRs: mean value is ${amean}")
                     }
                     val margin = 2 * amean - 1

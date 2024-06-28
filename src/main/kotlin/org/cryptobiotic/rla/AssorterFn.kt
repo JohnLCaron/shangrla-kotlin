@@ -1,5 +1,13 @@
 package org.cryptobiotic.rla
 
+// An assorter A assigns a nonnegative value to each ballot card, depending on the marks
+// the voter made on that ballot card.
+
+// value “1” to a ballot card if it has a mark for Alice but not for Bob; assign the value “0”
+//if the card has a mark for Bob but not for Alice; assign the value 1/2, otherwise (e.g., if
+//the card has an overvote or an undervote in this contest or does not contain the contest).
+//Then Alice beat Bob iff the average value of the assorter for the full set of cast ballot
+//cards is greater than 1/2: then Alice got more than 50% of the valid votes.
 data class AssorterFn(
     val contest: ContestSimple,
     val upper_bound: Double, // a priori upper bound on the value the assorter can take
@@ -9,11 +17,9 @@ data class AssorterFn(
 
     //         Compute the arithmetic mean along the specified axis.
     fun mean(cvr_list : List<CvrSimple>, use_style: Boolean = true): Double {
-        val count = cvr_list.filter { cvr -> if (use_style) cvr.has_contest(this.contest.id) else true }
-            .count()
+        // val count = cvr_list.filter { cvr -> if (use_style) cvr.has_contest(this.contest.id) else true }.count()
         // println("AssorterFn.mean count = $count")
-
-        cvr_list.subList(0, 11).forEach { println("   ${it.id} ${this.assort( it)}") }
+        // cvr_list.subList(0, 11).forEach { println("   ${it.id} ${this.assort( it)}") }
 
         val result = cvr_list.filter { cvr -> if (use_style) cvr.has_contest(this.contest.id) else true }
             .map { this.assort( it) }
