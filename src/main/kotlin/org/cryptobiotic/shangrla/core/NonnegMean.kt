@@ -24,6 +24,8 @@ enum class EstimFnType {
     FIXED,
 }
 
+data class CumulativeSum(val S: DoubleArray, val Stot: Double, val indices: IntArray, val mean: DoubleArray)
+
 /*
     Tests of the hypothesis that the mean of a population of values in [0, u] is less than or equal to t.
         Several tests are implemented, all ultimately based on martingales or supermartingales:
@@ -175,8 +177,6 @@ class NonnegMean (
         val first = min(1.0, 1.0 / npmax)
         return Pair(first, npmin)
     }
-
-    data class CumulativeSum(val S: DoubleArray, val Stot: Double, val indices: IntArray, val mean: DoubleArray)
 
     // "withReplacement = N is np.inf"
     fun sjm(N: Int, t: Double, x: DoubleArray): CumulativeSum {

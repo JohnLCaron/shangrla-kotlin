@@ -3,6 +3,7 @@ package org.cryptobiotic.start
 import org.cryptobiotic.shangrla.core.AuditType
 import org.cryptobiotic.shangrla.core.Candidates
 import org.cryptobiotic.shangrla.core.SocialChoiceFunction
+import org.cryptobiotic.start.NonnegMean.Companion.makeAlphaMart
 
 import java.security.SecureRandom
 import kotlin.math.ceil
@@ -54,7 +55,7 @@ class Audit(
                     winner = winr,
                     loser = losr,
                     assorter = PluralityAssorter(contest, winr, losr),
-                    initialTest = NonnegMean(u = 1.0, N = contest.ncards, t = .5)
+                    initialTest = makeAlphaMart(u = 1.0, N = contest.ncards, t = .5)
                 )
                 contest.addAssertion(assertion)
             }
@@ -89,7 +90,7 @@ class Audit(
                 winner = winner,
                 loser = Candidates.ALL_OTHERS.name,
             ),
-            initialTest = NonnegMean(u = 1 / (2 * contest.share_to_win), N = contest.ncards, t = 0.5)
+            initialTest = makeAlphaMart(u = 1 / (2 * contest.share_to_win), N = contest.ncards, t = 0.5)
         )
         contest.addAssertion(asn)
 

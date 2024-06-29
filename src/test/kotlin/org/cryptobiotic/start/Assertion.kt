@@ -18,7 +18,7 @@ class Assertion(
     var proved: Boolean = false
     var margin: Double = Double.POSITIVE_INFINITY   // "reported assorter margin"
     var sample_size: Int? = null
-    private var test = initialTest
+    private var test: NonnegMean = initialTest
 
     fun name() = "$winner v $loser"
 
@@ -26,6 +26,8 @@ class Assertion(
         return "Assertion(contest=${contest.id}, upperBound=${assorter.upperBound}, winner='$winner', loser='$loser', " +
                 "margin=$margin, p_value=$p_value, p_history=${p_history?.size}, proved=$proved, sample_size=$sample_size)"
     }
+
+    fun testFn(x: DoubleArray) = test.testFn.test(x)
 
     // set margin, test.mean
     fun set_margin_from_cvrs(cvrs: List<Cvr>): Double {
@@ -258,7 +260,7 @@ class Assertion(
                     val (d, u) = asn.mvrs_to_data(mvr_sample, cvr_sample)
                     asn.test = asn.test.copy(u=u)
                     // set upper bound for the test for each assorter
-                    val (p_value, p_history) = asn.test.testFn(d)
+                    val (p_value, p_history) = asn.testFn(d)
                     asn.p_value = p_value
                     asn.p_history = p_history.toList()
                     asn.proved = (p_value <= con.risk_limit) || asn.proved
