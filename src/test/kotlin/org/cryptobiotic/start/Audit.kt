@@ -3,6 +3,7 @@ package org.cryptobiotic.start
 import org.cryptobiotic.shangrla.core.AuditType
 import org.cryptobiotic.shangrla.core.Candidates
 import org.cryptobiotic.shangrla.core.SocialChoiceFunction
+import org.cryptobiotic.start.NonnegMean.Companion.makeAlphaMart
 
 import java.security.SecureRandom
 import kotlin.math.ceil
@@ -54,7 +55,7 @@ class Audit(
                     winner = winr,
                     loser = losr,
                     assorter = PluralityAssorter(contest, winr, losr),
-                    test = NonnegMean(u = 1.0, N = contest.ncards, t = .5)
+                    initialTest = makeAlphaMart(u = 1.0, N = contest.ncards, t = .5)
                 )
                 contest.addAssertion(assertion)
             }
@@ -89,27 +90,18 @@ class Audit(
                 winner = winner,
                 loser = Candidates.ALL_OTHERS.name,
             ),
-            test = NonnegMean(u = 1 / (2 * contest.share_to_win), N = contest.ncards, t = 0.5)
+            initialTest = makeAlphaMart(u = 1 / (2 * contest.share_to_win), N = contest.ncards, t = 0.5)
         )
         contest.addAssertion(asn)
 
     }
 
     // TODO do this before you make assertions ?? while you make assertions ??
-    // return minimum margin
     fun set_all_margins_from_cvrs(contests: List<Contest>, cvrs: List<Cvr>): Double {
-
         var min_margin = Double.POSITIVE_INFINITY
         for (con in contests) {
-            // val margins = mutableMapOf<String, Double>() // TODO Python has a field on the contest, but you can just look it up on contest.assertions
             for ((_,asn) in con.assertions) {
                 val margin = asn.set_margin_from_cvrs( cvrs)
-                val u = when (con.audit_type) {
-                    AuditType.POLLING -> asn.assorter.upperBound
-                    AuditType.CARD_COMPARISON, AuditType.ONEAUDIT -> 2 / (2 - margin / asn.assorter.upperBound)
-                    else -> throw Exception("audit type ${con.audit_type} not implemented")
-                }
-                asn.test.u = u // TODO
                 min_margin = min(min_margin, margin)
             }
         }
@@ -211,7 +203,6 @@ class Audit(
         //            )
         //        return total_size
 
-        var total_size: Int
         for (cvr in cvrs) {
             if (cvr.sampled) {
                 cvr.p = 1.0
@@ -227,12 +218,8 @@ class Audit(
         }
         // when old_sizes == 0, total_size should be con.sample_size (61); python has roundoff to get 62
         // total_size = ceil(np.sum([x.p for x in cvrs if !x.phantom))
-        val summ: Double = cvrs.filter { !it.phantom }.map { it.p!! }.sum()
-        val mul1 = 146663 * 4.159223248012437E-4
-        val mul = 146662 * 4.159223248012437E-4
-        val diff = 61 - mul
-        val cee = ceil(summ)
-        total_size = ceil(summ).toInt()
+        val summ: Double = cvrs.filter { !it.phantom }.map { it.p }.sum()
+        val total_size = ceil(summ).toInt()
         return total_size
     }
 

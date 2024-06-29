@@ -10,7 +10,7 @@ class Assertion(
     val winner: String,
     val loser: String,
     val assorter: Assorter,
-    val test: NonnegMean,
+    initialTest: NonnegMean,
 ) {
 
     var p_value: Double? = null
@@ -18,6 +18,7 @@ class Assertion(
     var proved: Boolean = false
     var margin: Double = Double.POSITIVE_INFINITY   // "reported assorter margin"
     var sample_size: Int? = null
+    private var test: NonnegMean = initialTest
 
     fun name() = "$winner v $loser"
 
@@ -26,6 +27,9 @@ class Assertion(
                 "margin=$margin, p_value=$p_value, p_history=${p_history?.size}, proved=$proved, sample_size=$sample_size)"
     }
 
+    fun testFn(x: DoubleArray) = test.testFn.test(x)
+
+    // set margin, test.mean
     fun set_margin_from_cvrs(cvrs: List<Cvr>): Double {
         val amean = this.assorter.mean(cvrs)
         if (amean < .5) {
@@ -49,7 +53,7 @@ class Assertion(
         // Tests of the hypothesis that the mean of a population of values in [0, u] is less than or equal to t
         // so u must be the max value of the population.
         // the math seems to be on page 10, if you take tau = 2.
-        this.test.u = u // TODO
+        this.test = this.test.changeMean(newu=u)
         return this.margin
     }
 
@@ -246,6 +250,7 @@ class Assertion(
 
 
     companion object {
+
         fun set_p_values(contests: List<Contest>, mvr_sample: List<Cvr>, cvr_sample: List<Cvr>): Double {
             require(mvr_sample.size == cvr_sample.size) {"unequal numbers of cvrs and mvrs"}
 
@@ -253,8 +258,9 @@ class Assertion(
             for (con in contests) {
                 for ((_, asn) in con.assertions) {
                     val (d, u) = asn.mvrs_to_data(mvr_sample, cvr_sample)
-                    asn.test.u = u       // set upper bound for the test for each assorter
-                    val (p_value, p_history) = asn.test.testFn(d)
+                    asn.test = asn.test.changeMean(newu=u)
+                    // set upper bound for the test for each assorter
+                    val (p_value, p_history) = asn.testFn(d)
                     asn.p_value = p_value
                     asn.p_history = p_history.toList()
                     asn.proved = (p_value <= con.risk_limit) || asn.proved
