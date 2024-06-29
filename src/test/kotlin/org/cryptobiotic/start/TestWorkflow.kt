@@ -30,7 +30,7 @@ class TestWorkflow {
         // skip for now, no phantoms
 
         // sets margins on the assertions
-        val min_margin = audit.set_all_margins_from_cvrs(contests, cvrs)
+        audit.set_all_margins_from_cvrs(contests, cvrs)
         // println("minimum assorter margin = ${min_margin}")
 
         contests.map { contest ->

@@ -6,18 +6,18 @@ import kotlin.math.ceil
 import kotlin.math.min
 
 // Tests of the hypothesis that the mean of a population of values in [0, u] is less than or equal to t
-class NonnegMean (
+data class NonnegMean (
         val N: Int,
-        var u: Double = 1.0,        // TODO mutable
+        val u: Double = 1.0,
         val t: Double = 0.5,        // TODO is it ever anything other than .5 ??
         val withReplacement: Boolean = false, // TODO
 
-        testFnType: TestFnType = TestFnType.ALPHA_MART,
-        estimFnType: EstimFnType = EstimFnType.OPTIMAL,
-        gOverride: Double = 0.1, // only used by kaplan_wald
-        random_order: Boolean = true, // only used by kaplan_wald
+        val testFnType: TestFnType = TestFnType.ALPHA_MART,
+        val estimFnType: EstimFnType = EstimFnType.OPTIMAL,
+        val gOverride: Double = 0.1, // only used by kaplan_wald
+        val random_order: Boolean = true, // only used by kaplan_wald
     ) {
-    val eta = (t + (u - t) / 2) // TODO u changes, but eta does not. Flaw in python code.
+    val eta = (t + (u - t) / 2) // TODO u changes, but eta does not: Flaw in python code.
     val estimFn: EstimatorFn
     val testFn: TestFn
 
@@ -348,6 +348,128 @@ class NonnegMean (
         val term = if (random_order) p_history.max() else (1.0 / p_history.last())
         val first = min (1.0, term)
         return Pair(first, npmin)
+    }
+}
 
+interface TestFn {
+    // return p, p_history
+    fun test(x: DoubleArray): Pair<Double, DoubleArray>
+}
+
+// testFn TODO paper reference
+class KaplanWald(val g : Double = 0.1, val random_order: Boolean = true): TestFn {
+    /*
+    Kaplan-Wald p-value for the hypothesis that the sample x is drawn IID from a population
+    with mean t against the alternative that the mean is less than t.
+
+    If there is a possibility that x has elements equal to zero, set g \in (0, 1);
+    otherwise, the p-value will be 1.
+
+    If the order of the values in the sample is random, you can set random_order = True to use
+    optional stopping to increase the power. If the values are not in random order or if you want
+    to use all the data, set random_order = False
+
+    Parameters:
+    -----------
+    x: array-like the sample
+    g: "padding" in case there any values in the sample are zero
+    random_order: Boolean
+            if the sample is in random order, it is legitimate to stop early, which
+            can yield a more powerful test. See above.
+
+    Returns:
+    --------
+    p: float p-value
+    p_history: sample by sample history of p-values. Not meaningful unless the sample is in random order.
+    */
+    override fun test(x: DoubleArray): Pair<Double, DoubleArray> {
+        if (g < 0.0 || g > 1.0) {
+            throw Exception("{$g}, but g must be between 0 and 1. ")
+        }
+        x.forEach { if (it < 0.0) throw Exception("Negative value in sample from a nonnegative population.") }
+        val xp = x.map { (1 - g) * it / t + g }.toDoubleArray()
+        val p_history = numpy_cumprod(xp)
+
+        // return np.min([1, 1 / np.max(p_history) if random_order else 1 / p_history[-1]]), np.minimum(1 / p_history, 1)
+        val npmin = p_history.map { min(1.0, 1.0 / it) }.toDoubleArray()
+        val term = if (random_order) p_history.max() else (1.0 / p_history.last())
+        val first = min(1.0, term)
+        return Pair(first, npmin)
+    }
+}
+
+// testFn TODO paper reference
+class AlphaMart(val g : Double = 0.1, val random_order: Boolean = true): TestFn {
+
+    override fun test(x: DoubleArray): Pair<Double, DoubleArray> {
+        /*
+    Finds the ALPHA martingale for the hypothesis that the population
+    mean is less than or equal to t using a martingale method,
+    for a population of size N, based on a series of draws x.
+
+    **The draws must be in random order**, or the sequence is not a supermartingale under the null
+
+    If N is finite, assumes the sample is drawn without replacement TODO
+    If N is infinite, assumes the sample is with replacement
+
+    Parameters
+    ----------
+    x: list corresponding to the data
+    attributes used:
+        keyword arguments for estim() and for this function
+        u: float > 0 (default 1); upper bound on the population
+        eta: float in (t,u] (default u*(1-eps))
+            value parametrizing the bet. Use alternative hypothesized population mean for polling audit
+            or a value nearer the upper bound for comparison audits
+
+
+    Returns
+    -------
+    p: float; sequentially valid p-value of the hypothesis that the population mean is less than or equal to t
+    p_history: sample by sample history of p-values. Not meaningful unless the sample is in random order.
+    */
+        // val atol = kwargs.get("atol", 2 * np.finfo(float).eps)
+        // val rtol = kwargs.get("rtol", 10e-6)
+
+        val (_, Stot, _, m) = this.sjm(N, t, x)
+
+        //         with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+        //            etaj = self.estim(x)
+        //            terms = np.cumprod((x * etaj / m + (u - x) * (u - etaj) / (u - m)) / u)
+        val etaj = this.estimFn(x)
+        val xp =
+            if (etaj.size == x.size) DoubleArray(x.size) { (x[it] * etaj[it] / m[it] + (u - x[it]) * (u - etaj[it]) / (u - m[it])) / u }
+            else if (etaj.size == 1) DoubleArray(x.size) { (x[it] * etaj[0] / m[it] + (u - x[it]) * (u - etaj[0]) / (u - m[it])) / u }
+            else throw RuntimeException("NonnegMean alpha_mart")
+
+        val terms = numpy_cumprod(xp)
+
+        // terms[m > u] = 0  # true mean is certainly less than hypothesized
+        repeat(terms.size) { if (m[it] > u) terms[it] = 0.0 } // true mean is certainly less than hypothesized
+        // terms[np.isclose(0, m, atol=atol)] = 1  # ignore
+        repeat(terms.size) { if (numpy_isclose(0.0, m[it])) terms[it] = 1.0 } // ignore
+        // terms[np.isclose(0, terms, atol=atol)] = ( 1 } # martingale effectively vanishes; p-value 1
+        repeat(terms.size) {
+            if (numpy_isclose(0.0, terms[it])) terms[it] = 1.0
+        } // martingale effectively vanishes; p-value 1
+        //        terms[m < 0] = np.inf  # true mean certainly greater than hypothesized
+        repeat(terms.size) {
+            if (m[it] < 0.0) terms[it] = Double.POSITIVE_INFINITY
+        } // true mean is certainly less than hypothesized
+
+        // terms[-1] = ( np.inf if Stot > N * t else terms[-1] )  # final sample makes the total greater than the null
+        // -1 is the last element
+        if (Stot > N * t) terms[terms.size - 1] =
+            Double.POSITIVE_INFINITY // final sample makes the total greater than the null
+
+        // return min(1, 1 / np.max(terms)), np.minimum(1, 1 / terms)
+        // np.minimum = element-wise minumum, presumably the smaller of 1 and 1/term
+        // np.max = maximum of an array
+        // min = min or an iterable
+
+        val npmin = terms.map { min(1.0, 1.0 / it) }.toDoubleArray()
+        val npmax = terms.max()
+        val first = min(1.0, 1.0 / npmax)
+        return Pair(first, npmin)
     }
 }
