@@ -77,7 +77,6 @@ data class Assertion(
     }
 
 
-    // TODO original fun overstatement_assorter(mvr: List<CVR>, cvr: List<CVR>, use_style: Boolean): Double {
     fun overstatement_assorter(mvr: Cvr, cvr: Cvr, use_style: Boolean): Double {
         /*
         assorter that corresponds to normalized overstatement error for an assertion
@@ -449,7 +448,6 @@ data class Assertion(
         this.sample_size = sample_size
         return sample_size
     }
-
 
     companion object {
         fun interleave_values(n_small: Int, n_med: Int, n_big: Int,

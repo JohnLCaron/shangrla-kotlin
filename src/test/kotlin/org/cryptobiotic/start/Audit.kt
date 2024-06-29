@@ -1,6 +1,9 @@
 package org.cryptobiotic.start
 
 import org.cryptobiotic.shangrla.core.AuditType
+import org.cryptobiotic.shangrla.core.Candidates
+import org.cryptobiotic.shangrla.core.SocialChoiceFunction
+
 import java.security.SecureRandom
 import kotlin.math.ceil
 import kotlin.math.max
@@ -12,7 +15,6 @@ class Audit(
     val error_rate_1: Double = 0.001, // rate of 1-vote overstatement errors
     val error_rate_2: Double = 0.0, // rate of 2-vote overstatement errors
     val reps: Int = 100,
-
     val auditType: AuditType = AuditType.CARD_COMPARISON,
     val use_styles: Boolean = true,
     ) {
@@ -26,27 +28,32 @@ class Audit(
     fun makeAssertions(contests: List<Contest>) {
         for (contest in contests) {
             val losers = contest.candidates.filter { !contest.winners.contains(it) }
-            make_plurality_assertions(contest, contest.winners, losers)
+            when (contest.choice_function) {
+                SocialChoiceFunction.PLURALITY -> {
+                    make_plurality_assertions(contest, contest.winners, losers)
+                }
+                SocialChoiceFunction.SUPERMAJORITY -> {
+                    require (contest.winners.size == 1)
+                    make_supermajority_assertion(contest, contest.winners[0])
+                }
+                else -> {
+                    throw RuntimeException("${contest.choice_function} not supported")
+                }
+            }
         }
     }
 
+    // highest candidate wins
     fun make_plurality_assertions(contest: Contest, winners: List<String>, losers: List<String>) {
 
+        // _test = NonnegMean(test=test, estim=estim, bet=bet, g=contest.g, u=1, N=contest.cards, t=1/2, random_order=true)
         for (winr in winners) {
             for (losr in losers) {
                 val assertion = Assertion(
                     contest,
                     winner = winr,
                     loser = losr,
-                    assorter = Assorter(
-                        contest = contest,
-                        assort =  { cvr: Cvr ->
-                            val w = cvr.get_vote_for(contest.id, winr)
-                            val l = cvr.get_vote_for(contest.id, losr)
-                            val calc = (w - l + 1) * 0.5 // eq 1.
-                            calc },
-                        upper_bound = 1.0,
-                    ),
+                    assorter = PluralityAssorter(contest, winr, losr),
                     test = NonnegMean(u = 1.0, N = contest.ncards, t = .5)
                 )
                 contest.addAssertion(assertion)
@@ -55,16 +62,54 @@ class Audit(
 
     }
 
+    // highest candidate with share_to_win percentage. share_to_win >= 1/2
+    fun make_supermajority_assertion(contest: Contest, winner: String) {
+        /*
+        Construct assertion that winner got >= share_to_win \in (0,1) of the valid votes
+
+        **TO DO: This method assumes there was a winner. To audit that there was no winner requires
+        flipping things.**
+
+        An equivalent condition is:
+
+           (votes for winner)/(2*share_to_win) + (invalid votes)/2 > 1/2.
+
+        Thus the correctness of a super-majority outcome (where share_to_win >= 1/2) can be checked with a single assertion.
+
+        Note: share_to_win < 1/2 might be useful for some social choice functions, including
+        primaries where candidates who receive less than some threshold share are eliminated.
+
+        A CVR with a mark for more than one candidate in the contest is considered an invalid vote.
+         */
+
+        val asn = Assertion(contest, winner = winner, loser = Candidates.ALL_OTHERS.name,
+            assorter = SupermajorityAssorter(
+                contest = contest,
+                upperBound = 1 / (2 * contest.share_to_win),
+                winner = winner,
+                loser = Candidates.ALL_OTHERS.name,
+            ),
+            test = NonnegMean(u = 1 / (2 * contest.share_to_win), N = contest.ncards, t = 0.5)
+        )
+        contest.addAssertion(asn)
+
+    }
+
+    // TODO do this before you make assertions ?? while you make assertions ??
     // return minimum margin
     fun set_all_margins_from_cvrs(contests: List<Contest>, cvrs: List<Cvr>): Double {
 
         var min_margin = Double.POSITIVE_INFINITY
         for (con in contests) {
-            // val margins = mutableMapOf<String, Double>() // TODO Python has a field on the contest, but you van just look it up on contest.assertions
+            // val margins = mutableMapOf<String, Double>() // TODO Python has a field on the contest, but you can just look it up on contest.assertions
             for ((_,asn) in con.assertions) {
                 val margin = asn.set_margin_from_cvrs( cvrs)
-                val u = 2 / (2 - margin / asn.assorter.upper_bound)
-                asn.test.u = u
+                val u = when (con.audit_type) {
+                    AuditType.POLLING -> asn.assorter.upperBound
+                    AuditType.CARD_COMPARISON, AuditType.ONEAUDIT -> 2 / (2 - margin / asn.assorter.upperBound)
+                    else -> throw Exception("audit type ${con.audit_type} not implemented")
+                }
+                asn.test.u = u // TODO
                 min_margin = min(min_margin, margin)
             }
         }
@@ -100,7 +145,7 @@ class Audit(
                         )
                     } else {
                         new_size = max(
-                            new_size, asn.find_sample_size(
+                            new_size, asn.estimateSampleSize(
                                 rate1 = this.error_rate_1,
                                 rate2 = this.error_rate_2,
                                 reps = this.reps, quantile = this.quantile,

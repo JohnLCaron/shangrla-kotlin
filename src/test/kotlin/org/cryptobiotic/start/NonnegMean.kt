@@ -10,14 +10,14 @@ class NonnegMean (
         val N: Int,
         var u: Double = 1.0,        // TODO mutable
         val t: Double = 0.5,        // TODO is it ever anything other than .5 ??
-        val withReplacement: Boolean = false,
+        val withReplacement: Boolean = false, // TODO
 
         testFnType: TestFnType = TestFnType.ALPHA_MART,
         estimFnType: EstimFnType = EstimFnType.OPTIMAL,
         gOverride: Double = 0.1, // only used by kaplan_wald
         random_order: Boolean = true, // only used by kaplan_wald
     ) {
-    val eta = (t + (u - t) / 2)
+    val eta = (t + (u - t) / 2) // TODO u changes, but eta does not. Flaw in python code.
     val estimFn: EstimatorFn
     val testFn: TestFn
 
@@ -55,79 +55,68 @@ class NonnegMean (
 
         Returns
         -------
-        sam_size: int
-        estimated sample size
+        sam_size: int = estimated sample size
         */
-        fun sample_size(x: DoubleArray, alpha: Double, reps: Int? = null, prefix: Boolean, quantile: Double): Int {
 
-        //         N = self.N
-        //         N = self.N
-        //        if reps is None:
+    // TODO paper reference
+    // estimate the quantile by a bootstrap-like simulation
+    fun estimateSampleSize(x: DoubleArray, alpha: Double, reps: Int, prefix: Boolean, quantile: Double): Int {
+
+        require (quantile in 0.0..1.0)
+
+        //            seed = kwargs.get("seed", 1234567890)
+        //            prng = np.random.RandomState(seed)  # use the Mersenne Twister for speed
+        //            sams = np.zeros(int(reps))
+        //            pfx = np.array(x) if prefix else []
+        //            ran_len = (N - len(x)) if prefix else N
+        //            for r in range(reps):
+        //                pop = np.append(pfx, prng.choice(x, size=ran_len, replace=True))
+        //                p = self.test(pop, **kwargs)[1]
+        //                crossed = p <= alpha
+        //                sams[r] = N if np.sum(crossed) == 0 else (np.argmax(crossed) + 1)
+        //            sam_size = int(np.quantile(sams, quantile))
+        //        return sam_size
+        val sams = IntArray(reps)
+        val pfx = if (prefix) x else DoubleArray(0)
+        val ran_len = if (prefix) (N - x.size) else N
+        repeat(reps) {
+            val choices = python_choice(x, size = ran_len)
+            val pop = numpy_append(pfx, choices) // tile data to make the population
+            val (_, p_history) = this.testFn(pop)
+            val crossed = p_history.map{ it <= alpha }
+            val crossedCount = crossed.filter { it }.count()
+            sams[it] = if (crossedCount == 0) N else (indexFirstTrue(crossed) + 1)
+        }
+        sams.sort() // sort in place
+        val sam_size = numpy_quantile(sams, quantile)
+        return sam_size
+    }
+
+    // If `reps is None`, tiles copies of `x` to produce a list of length `N`.
+    fun estimateSampleSizeTiled(x: DoubleArray, alpha: Double): Int {
+
         //            pop = np.repeat(np.array(x), math.ceil(N/len(x)))[0:N]  # tile data to make the population
         //            p = self.test(pop, **kwargs)[1]
         //            crossed = (p<=alpha)
         //            sam_size = int(N if np.sum(crossed)==0 else (np.argmax(crossed)+1))
-        //        else:  # estimate the quantile by a bootstrap-like simulation
-        //            seed = kwargs.get('seed',1234567890)
-        //            prng = np.random.RandomState(seed)  # use the Mersenne Twister for speed
-        //            sams = np.zeros(int(reps))
-        //            pfx = np.array(x) if prefix else []
-        //            ran_len = (N-len(x)) if prefix else N
-        //            for r in range(reps):
-        //                pop = np.append(pfx, prng.choice(x, size=ran_len, replace=True))
-        //                p = self.test(pop, **kwargs)[1]
-        //                crossed = (p<=alpha)
-        //                sams[r] = N if np.sum(crossed)==0 else (np.argmax(crossed)+1)
-        //            sam_size = int(np.quantile(sams, quantile))
-        //        return sam_size
 
-        require (quantile in 0.0..1.0)
+        //            crossed = p <= alpha : Array of true or false
+        //            sum = np.sum(crossed) : count of true
+        //            argmax = np.argmax(crossed): ?? the first index that has true
+        //            sam_size = int(N if sum == 0 else (argmax + 1))
 
-        val sam_size = if (reps == null) {
-            val repeats = ceil(N.toDouble() / x.size).toInt()
-            val pop = numpy_repeat(x, repeats) // tile data to make the population
-            require( pop.size == N)
-            val (p, p_history) = this.testFn(pop)
-//            crossed = p <= alpha : Array of true or false
-//            sum = np.sum(crossed) : count of true
-//            argmax = np.argmax(crossed): ?? the first index that has true
-//            sam_size = int(N if sum == 0 else (argmax + 1))
-            // int(N if np.sum(crossed) == 0 else (np.argmax(crossed) + 1))
-            // i guess you could just find the first index thats true.
-            val firstIndex = p_history.indexOfFirst{ it <= alpha }
-            if (firstIndex < 0) N else firstIndex + 1
+        val repeats = ceil(N.toDouble() / x.size).toInt()
+        val pop = numpy_repeat(x, repeats) // tile data to make the population
+        require( pop.size == N)
+        val (p, p_history) = this.testFn(pop)
 
-        } else { // estimate the quantile by a bootstrap-like simulation
-            //            seed = kwargs.get("seed", 1234567890)
-            //            prng = np.random.RandomState(seed)  # use the Mersenne Twister for speed
-            //            sams = np.zeros(int(reps))
-            //            pfx = np.array(x) if prefix else []
-            //            ran_len = (N - len(x)) if prefix else N
-            //            for r in range(reps):
-            //                pop = np.append(pfx, prng.choice(x, size=ran_len, replace=True))
-            //                p = self.test(pop, **kwargs)[1]
-            //                crossed = p <= alpha
-            //                sams[r] = N if np.sum(crossed) == 0 else (np.argmax(crossed) + 1)
-            //            sam_size = int(np.quantile(sams, quantile))
-            //        return sam_size
-            val sams = IntArray(reps)
-            val pfx = if (prefix) x else DoubleArray(0)
-            val ran_len = if (prefix) (N - x.size) else N
-            repeat(reps) {
-                val choices = python_choice(x, size = ran_len)
-                val pop = numpy_append(pfx, choices) // tile data to make the population
-                val (p, p_history) = this.testFn(pop)
-                val crossed = p_history.map{ it <= alpha }
-                val crossedCount = crossed.filter { it }.count()
-                sams[it] = if (crossedCount == 0) N else (indexFirstTrue(crossed) + 1)
-            }
-            sams.sort() // sort in place
-            numpy_quantile(sams, quantile)
-        }
-        return sam_size
+        // int(N if np.sum(crossed) == 0 else (np.argmax(crossed) + 1))
+        // i guess you could just find the first index thats true.
+        val firstIndex = p_history.indexOfFirst{ it <= alpha }
+        return if (firstIndex < 0) N else firstIndex + 1
     }
 
-    // testFn
+    // testFn TODO paper reference
     // return (p, p_history)
     fun alpha_mart(x: DoubleArray): Pair<Double, DoubleArray> {
         /*
@@ -137,7 +126,7 @@ class NonnegMean (
 
         **The draws must be in random order**, or the sequence is not a supermartingale under the null
 
-        If N is finite, assumes the sample is drawn without replacement
+        If N is finite, assumes the sample is drawn without replacement TODO
         If N is infinite, assumes the sample is with replacement
 
         Parameters
@@ -158,6 +147,7 @@ class NonnegMean (
         */
         // val atol = kwargs.get("atol", 2 * np.finfo(float).eps)
         // val rtol = kwargs.get("rtol", 10e-6)
+
         val (_, Stot, _, m) = this.sjm(N, t, x)
 
         //         with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
@@ -252,8 +242,7 @@ class NonnegMean (
 
         Parameters
         ----------
-        x: np.array
-            input data
+        x: input data
         kwargs:
             eta: float in (t, u) (default u*(1-eps))
                 alternative hypothethesized value for the population mean
@@ -287,6 +276,7 @@ class NonnegMean (
         return m
     }
 
+    // estimFn
     fun optimal_comparison(rate_error_2: Double = 1e-4): DoubleArray {
         /*
         The value of eta corresponding to the "bet" that is optimal for ballot-level comparison audits,
@@ -304,15 +294,12 @@ class NonnegMean (
 
         Parameters
         ----------
-        x: np.array
-            input data
-        rate_error_2: float
-            hypothesized rate of two-vote overstatements
+        x: input data
+        rate_error_2: hypothesized rate of two-vote overstatements
 
         Returns
         -------
-        eta: float
-            estimated alternative mean to use in alpha
+        eta: estimated alternative mean to use in alpha
         */
         // TODO: where is rate_error_2 set?
         if (this.u == 1.0)
@@ -322,6 +309,7 @@ class NonnegMean (
         return doubleArrayOf(result)
     }
 
+    // testFn TODO paper reference
     fun kaplan_wald(x: DoubleArray, g : Double = 0.1, random_order: Boolean = true): Pair<Double, DoubleArray> {
         /*
         Kaplan-Wald p-value for the hypothesis that the sample x is drawn IID from a population
@@ -361,9 +349,5 @@ class NonnegMean (
         val first = min (1.0, term)
         return Pair(first, npmin)
 
-    }
-
-    companion object {
-        val PLURALITY = NonnegMean()
     }
 }

@@ -714,6 +714,20 @@ class Cvr (
             return r
         }
 
+        fun tabulateVotes(cvrs: List<Cvr>): Map<String, Map<String, Int>> {
+            val r = mutableMapOf<String, MutableMap<String, Int>>()
+            for (cvr in cvrs) {
+                for ((con, conVotes) in cvr.votes) {
+                    val accumVotes = r.getOrPut(con) { mutableMapOf() }
+                    for ((cand, vote) in conVotes) {
+                        val accum = accumVotes.getOrPut(cand) { 0 }
+                        accumVotes[cand] = accum + vote
+                    }
+                }
+            }
+            return r
+        }
+
         // Number of cards in each contest, return contestId -> ncards
         fun tabulate_cards_contests(cvr_list: List<Cvr>): Map<String, Int> {
             val d = mutableMapOf<String, Int>()

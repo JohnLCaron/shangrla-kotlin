@@ -1,5 +1,7 @@
 package org.cryptobiotic.start
 
+import org.cryptobiotic.shangrla.core.Assertion.Companion.interleave_values
+import org.cryptobiotic.shangrla.core.AuditType
 import org.cryptobiotic.shangrla.core.numpy_arange
 import kotlin.math.max
 
@@ -20,7 +22,7 @@ class Assertion(
     fun name() = "$winner v $loser"
 
     override fun toString(): String {
-        return "Assertion(contest=${contest.id}, upper_bound=${assorter.upper_bound}, winner='$winner', loser='$loser', " +
+        return "Assertion(contest=${contest.id}, upperBound=${assorter.upperBound}, winner='$winner', loser='$loser', " +
                 "margin=$margin, p_value=$p_value, p_history=${p_history?.size}, proved=$proved, sample_size=$sample_size)"
     }
 
@@ -38,10 +40,16 @@ class Assertion(
         // greater than or equal to the number of valid votes.)
         this.margin = 2 * amean - 1 // eq 3
 
+        val u = when (this.contest.audit_type) {
+            AuditType.POLLING -> this.assorter.upperBound
+            AuditType.CARD_COMPARISON, AuditType.ONEAUDIT -> 2 / (2 - this.margin / this.assorter.upperBound)
+            else -> throw NotImplementedError("audit type ${this.contest.audit_type} not supported")
+        }
+
         // Tests of the hypothesis that the mean of a population of values in [0, u] is less than or equal to t
         // so u must be the max value of the population.
         // the math seems to be on page 10, if you take tau = 2.
-        this.test.u = 2 / (2 - this.margin / this.assorter.upper_bound)
+        this.test.u = u // TODO
         return this.margin
     }
 
@@ -70,7 +78,7 @@ class Assertion(
     fun mvrs_to_data(mvr_sample: List<Cvr>, cvr_sample: List<Cvr>): Pair<DoubleArray, Double> {
         require(this.margin != Double.POSITIVE_INFINITY) { "Margin is not set"  }
         require(this.margin > 0.0) { "Margin ${this.margin} is nonpositive" }
-        val upper_bound = this.assorter.upper_bound
+        val upper_bound = this.assorter.upperBound
         val con = this.contest
 
         var u: Double
@@ -144,64 +152,103 @@ class Assertion(
     fun find_sample_size_with_data(
         data: DoubleArray,
         prefix: Boolean = false,
-        reps: Int? = null,
+        reps: Int,
         quantile: Double = 0.5, // quantile of the distribution of sample sizes to return
         seed: Int = 1234567890 // seed in numpy.random to estimate the quantile
     ): Int {
-        return this.test.sample_size(
+        return this.test.estimateSampleSize(
             x = data, alpha = this.contest.risk_limit, reps = reps,
             prefix = prefix, quantile = quantile, // seed = seed
         )
     }
 
-    fun find_sample_size(
+    fun estimateSampleSize(
         prefix: Boolean = false,
         rate1: Double? = null,
         rate2: Double? = null,
-        reps: Int? = null,
-        quantile: Double = 0.5, // quantile of the distribution of sample sizes to return
+        reps: Int,
+        quantile: Double, // quantile of the distribution of sample sizes to return
     ): Int {
         require(this.margin != Double.POSITIVE_INFINITY) { "Margin is not set"  }
         require(this.margin > 0.0) { "Margin ${this.margin} is nonpositive" }
 
+        return if (this.contest.audit_type == AuditType.POLLING) estimateSampleSizePolling(prefix, reps, quantile)
+        else estimateSampleSizeComparision(prefix, rate1, rate2, reps, quantile)
+    }
+
+    fun estimateSampleSizePolling(
+        prefix: Boolean = false,
+        reps: Int,
+        quantile: Double = 0.5, // quantile of the distribution of sample sizes to return
+    ): Int {
+
+        val big = this.assorter.upperBound
+
+        val n_0 = this.contest.tally[this.loser]!! // LOOK nullability
+        val n_big = this.contest.tally[this.winner]!! // LOOK nullability
+        val n_half = this.test.N - n_0 - n_big
+        //         fun interleave_values(n_small: Int, n_med: Int, n_big: Int, small: Double, med: Double, big: Double): DoubleArray {
+        val x = interleave_values(n_0, n_half, n_big, big = big)
+
+        val sample_size = this.test.estimateSampleSize(
+            x = x,
+            alpha = this.contest.risk_limit,
+            reps = reps,
+            prefix = prefix,
+            quantile = quantile, // seed = seed
+        )
+        this.sample_size = sample_size
+        return sample_size
+    }
+
+    fun estimateSampleSizeComparision(
+        prefix: Boolean = false,
+        rate1: Double? = null,
+        rate2: Double? = null,
+        reps: Int,
+        quantile: Double = 0.5, // quantile of the distribution of sample sizes to return
+    ): Int {
         val big = this.make_overstatement(overs = 0.0)
         val small = this.make_overstatement(overs = 0.5)
         println("  Assertion ${name()} big = ${big} small = ${small}")
 
         val rate_1 = rate1 ?: ((1 - this.margin) / 2)   // rate of small values
-        var x = DoubleArray(this.test.N) { big } // array N floats, all equal to big
+        val x = DoubleArray(this.test.N) { big } // array N floats, all equal to big
 
         val rate_1_i = numpy_arange(0, this.test.N, step = (1.0 / rate_1).toInt())
         val rate_2_i = if (rate2 != null  && rate2 != 0.0) numpy_arange(0, this.test.N, step = (1.0 / rate2).toInt()) else IntArray(0)
         rate_1_i.forEach { x[it] = small }
         rate_2_i.forEach { x[it] = 0.0 }
 
-        val sample_size = this.test.sample_size(
-            x = x, alpha = this.contest.risk_limit, reps = reps,
-            prefix = prefix, quantile = quantile, // seed = seed
+        val sample_size = this.test.estimateSampleSize(
+            x = x,
+            alpha = this.contest.risk_limit,
+            reps = reps,
+            prefix = prefix,
+            quantile = quantile, // seed = seed
         )
         this.sample_size = sample_size
         return sample_size
     }
 
+
     fun make_overstatement(overs: Double): Double {
         // TODO reference in paper
-        val result =  (1 - overs / this.assorter.upper_bound) / (2 - this.margin / this.assorter.upper_bound)
+        val result =  (1 - overs / this.assorter.upperBound) / (2 - this.margin / this.assorter.upperBound)
         return result
     }
 
     //  assorter that corresponds to normalized overstatement error for an assertion
-    fun overstatement_assorter(mvr: Cvr, cvr: Cvr): Double {
-        return (1 - this.assorter.overstatement(mvr, cvr) / this.assorter.upper_bound) /
-                (2 - this.margin / this.assorter.upper_bound)
+    fun overstatement_assorter(mvr: Cvr, cvr: Cvr, use_style: Boolean = true): Double {
+        return (1 - this.assorter.overstatement(mvr, cvr, use_style) / this.assorter.upperBound) /
+                (2 - this.margin / this.assorter.upperBound)
     }
 
 
     companion object {
         fun set_p_values(contests: List<Contest>, mvr_sample: List<Cvr>, cvr_sample: List<Cvr>): Double {
-            if (cvr_sample != null) {
-                require(mvr_sample.size == cvr_sample.size) {"unequal numbers of cvrs and mvrs"}
-            }
+            require(mvr_sample.size == cvr_sample.size) {"unequal numbers of cvrs and mvrs"}
+
             var p_max = 0.0
             for (con in contests) {
                 for ((_, asn) in con.assertions) {
