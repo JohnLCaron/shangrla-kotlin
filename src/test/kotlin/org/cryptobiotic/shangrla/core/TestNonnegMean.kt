@@ -132,7 +132,7 @@ class TestNonnegMean {
      */
 
     @Test
-    fun test_sample_size() {
+    fun test_estimateSampleSize() {
         val eta = 0.75
         val u = 1.0
         val N = 1000

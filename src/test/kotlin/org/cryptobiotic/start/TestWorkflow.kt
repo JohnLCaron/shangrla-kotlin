@@ -1,7 +1,7 @@
 package org.cryptobiotic.start
 
-
 import kotlin.test.Test
+import kotlin.test.assertEquals
 
 class TestWorkflow {
 
@@ -49,7 +49,7 @@ class TestWorkflow {
 
         val samples = audit.assign_sample_nums(cvrs, sample_size).toList()
 
-        // Tst 1. suppose there are no erros, so that mvr == cvr
+        // Tst 1. suppose there are no errors, so that mvr == cvr
         // Compute the p values
         val p_max = Assertion.set_p_values(contests=contests, mvr_sample=samples, cvr_sample=samples)
         println("p_max = ${p_max}")
@@ -59,5 +59,6 @@ class TestWorkflow {
             contest.assertions.forEach { println("  ${it}") }
         }
 
+        assertEquals(29, sample_size)
     }
 }

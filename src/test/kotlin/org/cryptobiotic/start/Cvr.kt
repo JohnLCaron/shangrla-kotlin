@@ -15,7 +15,16 @@ data class Cvr(
         return if (votes[contestId] == null) 0 else votes[contestId]!![candidate] ?: 0
     }
 
+    // Is there exactly one vote among the candidates in the contest `contest_id`?
+    fun has_one_vote(contest_id: String, candidates: List<String>): Boolean {
+        val contestVotes = this.votes[contest_id] ?: return false
+        val totalVotes = candidates.map{ contestVotes[it] ?: 0 }.sum()
+        return (totalVotes == 1)
+    }
+
     companion object {
+        // also see make_phantoms in CvrBuilder
+
         fun tabulateVotes(cvrs: List<Cvr>): Map<String, Map<String, Int>> {
             val r = mutableMapOf<String, MutableMap<String, Int>>()
             for (cvr in cvrs) {

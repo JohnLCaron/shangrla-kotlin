@@ -17,11 +17,7 @@ data class AssorterFn(
 
     //         Compute the arithmetic mean along the specified axis.
     fun mean(cvr_list : List<CvrSimple>, use_style: Boolean = true): Double {
-        // val count = cvr_list.filter { cvr -> if (use_style) cvr.has_contest(this.contest.id) else true }.count()
-        // println("AssorterFn.mean count = $count")
-        // cvr_list.subList(0, 11).forEach { println("   ${it.id} ${this.assort( it)}") }
-
-        val result = cvr_list.filter { cvr -> if (use_style) cvr.has_contest(this.contest.id) else true }
+          val result = cvr_list.filter { cvr -> if (use_style) cvr.has_contest(this.contest.id) else true }
             .map { this.assort( it) }
             .average()
         return result
