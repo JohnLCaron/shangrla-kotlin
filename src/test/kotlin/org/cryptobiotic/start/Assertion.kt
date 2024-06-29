@@ -53,7 +53,7 @@ class Assertion(
         // Tests of the hypothesis that the mean of a population of values in [0, u] is less than or equal to t
         // so u must be the max value of the population.
         // the math seems to be on page 10, if you take tau = 2.
-        this.test = this.test.copy(u=u)
+        this.test = this.test.changeMean(newu=u)
         return this.margin
     }
 
@@ -258,7 +258,7 @@ class Assertion(
             for (con in contests) {
                 for ((_, asn) in con.assertions) {
                     val (d, u) = asn.mvrs_to_data(mvr_sample, cvr_sample)
-                    asn.test = asn.test.copy(u=u)
+                    asn.test = asn.test.changeMean(newu=u)
                     // set upper bound for the test for each assorter
                     val (p_value, p_history) = asn.testFn(d)
                     asn.p_value = p_value

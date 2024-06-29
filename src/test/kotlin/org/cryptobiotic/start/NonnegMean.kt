@@ -14,7 +14,13 @@ data class NonnegMean(
     val testFn: TestFn
 ) {
 
-    fun changeMean(): NonnegMean {
+    fun changeMean(newu: Double): NonnegMean {
+        return if (testFn is AlphaMart) {
+            val testFn = AlphaMart(N, withReplacement, t = t, u = newu, testFn.estimFnType)
+            return NonnegMean(N, withReplacement, t = t, u = newu, testFn)
+        } else {
+            this.copy(u=newu)
+        }
 
     }
 
@@ -341,7 +347,7 @@ class KaplanWald(val t: Double, val g: Double = 0.1, val random_order: Boolean =
 }
 
 // TODO paper reference
-class AlphaMart(val N: Int, val withReplacement: Boolean, val t: Double, val u: Double, estimFnType: EstimFnType) : TestFn {
+class AlphaMart(val N: Int, val withReplacement: Boolean, val t: Double, val u: Double, val estimFnType: EstimFnType) : TestFn {
     val estimFn: EstimatorFn
 
     init {
@@ -540,9 +546,10 @@ class AlphaMart(val N: Int, val withReplacement: Boolean, val t: Double, val u: 
         -------
         eta: estimated alternative mean to use in alpha
         */
-        // TODO: where is rate_error_2 set?
+        // TODO python doesnt check (2 - 2 * self.u) != 0; self.u = 1
         if (this.u == 1.0)
-            throw RuntimeException("optimal_comparison: u ${this.u} must be < 1")
+            throw RuntimeException("optimal_comparison: u ${this.u} must != 1")
+
         val p2 = rate_error_2 // getattr(self, "rate_error_2", 1e-4)  // rate of 2-vote overstatement errors
         val result = (1 - this.u * (1 - p2)) / (2 - 2 * this.u) + this.u * (1 - p2) - .5
         return doubleArrayOf(result)

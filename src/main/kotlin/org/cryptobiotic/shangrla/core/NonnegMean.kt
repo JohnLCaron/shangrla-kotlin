@@ -673,10 +673,17 @@ class NonnegMean (
                 estimated alternative mean to use in alpha
             */
             // TO DO: double check where rate_error_2 is set
+        //         p2 = getattr(self, "rate_error_2", 1e-4)  # rate of 2-vote overstatement errors
+        //        return (1 - self.u * (1 - p2)) / (2 - 2 * self.u) + self.u * (1 - p2) - 1 / 2
+
+        // TODO python doesnt check (2 - 2 * self.u) != 0; self.u = 1
         if (this.u == 1.0)
             throw RuntimeException("optimal_comparison: u ${this.u} must be < 1")
+
         val p2 = rate_error_2 // getattr(self, "rate_error_2", 1e-4)  // rate of 2-vote overstatement errors
         val result = (1 - this.u * (1 - p2)) / (2 - 2 * this.u) + this.u * (1 - p2) - .5
+        val result1 = (1 - this.u * (1 - p2))
+        val result2 = (2 - 2 * this.u) + this.u * (1 - p2) - .5
         return doubleArrayOf(result)
         }
 
