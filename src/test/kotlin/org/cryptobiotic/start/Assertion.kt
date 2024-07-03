@@ -2,6 +2,8 @@ package org.cryptobiotic.start
 
 import org.cryptobiotic.shangrla.core.Assertion.Companion.interleave_values
 import org.cryptobiotic.shangrla.core.AuditType
+import org.cryptobiotic.shangrla.core.Candidates
+import org.cryptobiotic.shangrla.core.SocialChoiceFunction
 import org.cryptobiotic.shangrla.core.numpy_arange
 import kotlin.math.max
 
@@ -54,6 +56,61 @@ class Assertion(
         // so u must be the max value of the population.
         // the math seems to be on page 10, if you take tau = 2.
         this.test = this.test.changeMean(newu=u)
+        return this.margin
+    }
+
+    fun set_margin_from_tally(tallyInput: Map<String, Int>? = null): Double { // cand -> count.
+        /*
+        find the assorter margin between implied by a tally.
+        Generally useful only for approval, plurality, and supermajority contests.
+        Assumes the number of cards containing the contest has been set.
+
+        Parameters
+        ----------
+        tallyInput: dict of tallies for the candidates in the contest. Keys are candidates as listed
+            in Contest.candidates. If `tally is None` tries to use the contest.tally.
+
+        The margin for a supermajority contest with a winner is (see SHANRGLA section 2.3)
+            2(pq/(2f) + (1 − q)/2 - 1/2) = q(p/f-1)
+         where:
+            q is the fraction of cards that have valid votes
+            p is the fraction of cards that have votes for the winner
+            f is the fraction of valid votes required to win.
+
+        Side effects
+        ------------
+        sets this.margin
+
+        */
+        //        tally = tally if tally else self.contest.tally
+        //        if self.contest.choice_function == Contest.SOCIAL_CHOICE_FUNCTION.PLURALITY \
+        //             or self.contest.choice_function == Contest.SOCIAL_CHOICE_FUNCTION.APPROVAL:
+        //            self.margin = (tally[self.winner]-tally[self.loser])/self.contest.cards
+        //        elif self.contest.choice_function == Contest.SOCIAL_CHOICE_FUNCTION.SUPERMAJORITY:
+        //            if self.winner == Candidates.NO_CANDIDATE or self.loser != Candidates.ALL_OTHERS:
+        //                raise NotImplementedError(f'TO DO: currently only support super-majority with a winner')
+        //            else:
+        //                q = np.sum([tally[c] for c in self.contest.candidates])/self.contest.cards
+        //                p = tally[self.winner]/self.contest.cards
+        //                self.margin = q*(p/self.contest.share_to_win - 1)
+        //        else:
+        //            raise NotImplementedError(f'social choice function {self.contest.choice_function} not supported')
+
+        val tally = tallyInput ?: this.contest.tally
+        if (this.contest.choice_function in listOf(SocialChoiceFunction.PLURALITY, SocialChoiceFunction.APPROVAL)) {
+            this.margin = (tally[this.winner]!! - tally[this.loser]!!).toDouble() / this.contest.ncards // // TODO check nullable
+        } else if (this.contest.choice_function == SocialChoiceFunction.SUPERMAJORITY) {
+            if (this.winner == Candidates.NO_CANDIDATE.name || this.loser != Candidates.ALL_OTHERS.name) {
+                throw NotImplementedError("TO DO: currently only support super-majority with a winner")
+            } else {
+                // val q = np.sum([tally[c] for c in this.contest.candidates])/this.contest.cards
+                val q = this.contest.candidates.map { tally[it]!! }.sum() / this.contest.ncards // LOOK check nullable
+                val p = tally[this.winner]!! / this.contest.ncards // LOOK check nullable
+                this.margin = q * (p / this.contest.share_to_win - 1)
+            }
+        } else {
+            throw NotImplementedError("social choice function ${this.contest.choice_function} not supported")
+        }
         return this.margin
     }
 
