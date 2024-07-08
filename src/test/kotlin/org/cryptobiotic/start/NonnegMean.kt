@@ -6,14 +6,39 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
 
+interface TestFn {
+    // return p, p_history
+    fun test(x: DoubleArray): Pair<Double, DoubleArray>
+}
+
+// Estimator of the true mean (theta)
+typealias EstimatorFn = (x: DoubleArray) -> DoubleArray
+
+// Tests of the hypothesis that the mean of a population of values in [0, u] is less than or equal to t.
+// probably only need AlphaMart
+enum class TestFnType {
+    ALPHA_MART,
+    BETTING_MART,
+    KAPLAN_KOLMOGOROV,
+    KAPLAN_MARKOV,
+    KAPLAN_WALD,
+    WALD_SPRT,
+}
+
+enum class EstimFnType {
+    OPTIMAL,
+    FIXED,
+}
+
 // Tests of the hypothesis that the mean of a population of values in [0, u] is less than or equal to t
 data class NonnegMean(
-    val N: Int,
+    val N: Int, // If N is np.inf, it means the sampling is with replacement
     val withReplacement: Boolean = false, // TODO
-    val t: Double = 0.5,        // TODO is it ever anything other than .5 ??
+    val t: Double = 0.5,        // the hypothesized mean "under the null".
     val u: Double = 1.0,        // mutable
-    val testFn: TestFn          // probable only need AlphaMart
+    val testFn: TestFn
 ) {
+    val isFinite = !withReplacement
 
     fun changeMean(newu: Double): NonnegMean {
         return if (testFn is AlphaMart) {
@@ -300,11 +325,6 @@ data class NonnegMean(
     }
 }
 
-interface TestFn {
-    // return p, p_history
-    fun test(x: DoubleArray): Pair<Double, DoubleArray>
-}
-
 // testFn TODO paper reference
 class KaplanWald(val t: Double, val g: Double = 0.1, val random_order: Boolean = true) : TestFn {
     /*
@@ -351,12 +371,13 @@ class KaplanWald(val t: Double, val g: Double = 0.1, val random_order: Boolean =
 // Finds the ALPHA martingale for the hypothesis that the population mean is less than or equal to t using a martingale
 // method, for a population of size N, based on a series of draws x.
 //     u > 0 (default 1); upper bound on the population
-// estimFn: Estimation of the mean
+// estimFn: Estimation of the mean (aka eta_j)
 class AlphaMart(val N: Int, val withReplacement: Boolean, val t: Double, val u: Double, val estimFnType: EstimFnType) : TestFn {
     val estimFn: EstimatorFn
+    val isFinite = !withReplacement
 
     init {
-        val eta = (t + (u - t) / 2)
+        val eta = (t + (u - t) / 2) // initial estimate of the population mean
         val estimFixed: EstimatorFn = { x -> this.fixed_alternative_mean(x, eta) }
         val estimOptimal: EstimatorFn = { x -> this.optimal_comparison() } // TODO pass error_2_rate here ?
         estimFn = if (estimFnType == EstimFnType.OPTIMAL) estimOptimal else estimFixed
@@ -370,23 +391,36 @@ class AlphaMart(val N: Int, val withReplacement: Boolean, val t: Double, val u: 
         // val atol = kwargs.get("atol", 2 * np.finfo(float).eps)
         // val rtol = kwargs.get("rtol", 10e-6)
 
-        val (_, Stot, _, m) = this.sjm(N, t, x)
-
-        //         with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
-        //            etaj = self.estim(x)
-        //            terms = np.cumprod((x * etaj / m + (u - x) * (u - etaj) / (u - m)) / u)
+        println("x = ${x.contentToString()}")
 
         // TODO This is eq 4 of ALPHA, p.5 :
         //      T_j = T_j-1 * (X_j * eta_j / mu_j + (u - X_j) * (u - eta_j) / ( u - mu_j)) / u
         //    where mu = m, T0 = 1.
         //
         val etaj = this.estimFn(x) // estimFixed returns single "fixed" value; estimOptimal an array of size x
+        println("etaj = ${etaj.contentToString()}")
+
+        val (_, Stot, _, m) = this.sjm(N, t, x)
+        println("m = ${m.contentToString()}")
+
+        //         with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+        //            etaj = self.estim(x)
+        //            terms = np.cumprod((x * etaj / m + (u - x) * (u - etaj) / (u - m)) / u)
+
+        // testStatistic = if (populationMean < 0.0) Double.POSITIVE_INFINITY else {
+        //    (testStatistic / upperBound) * (xj * etaj / populationMean + (upperBound - xj) * (upperBound - etaj) / (upperBound - populationMean))
+        // }
+        val tja = DoubleArray(x.size) { (x[it] * etaj[it] / m[it] + (u - x[it]) * (u - etaj[it]) / (u - m[it])) / u }
+
+        // meed both m and eta
         val tj =
             if (etaj.size == x.size) DoubleArray(x.size) { (x[it] * etaj[it] / m[it] + (u - x[it]) * (u - etaj[it]) / (u - m[it])) / u }
             else if (etaj.size == 1) DoubleArray(x.size) { (x[it] * etaj[0] / m[it] + (u - x[it]) * (u - etaj[0]) / (u - m[it])) / u }
             else throw RuntimeException("NonnegMean alpha_mart")
         // these are the "terms" = T_j = T_j-1 * (tj)
         val terms = numpy_cumprod(tj)
+        println("tj = ${tj.contentToString()}")
+        println("T = ${terms.contentToString()}")
 
         // terms[m > u] = 0  # true mean is certainly less than hypothesized
         repeat(terms.size) { if (m[it] > u) terms[it] = 0.0 } // true mean is certainly less than hypothesized
@@ -456,10 +490,15 @@ class AlphaMart(val N: Int, val withReplacement: Boolean, val t: Double, val u: 
 //        j = np.arange(1, len(x) + 1)  # 1, 2, 3, ..., len(x)
 //        assert j[-1] <= N, "Sample size is larger than the population!"
         val j = IntArray(x.size) { it + 1 } // 1, 2, 3, ..., len(x)
-        require(withReplacement || x.size <= N) { "Sample size is larger than the population!" }
+        require(!isFinite || x.size <= N) { "Sample size is larger than the population!" }
 //        m = ( (N * t - S) / (N - j + 1) if np.isfinite(N) else t )  # mean of population after (j-1)st draw, if null is true (t=eta is the mean)
         // val m = if (withReplacement) doubleArrayOf(t) else DoubleArray(x.size) { (N * t - Sp[it]) / (N - j[it] + 1)  }
-        val m = DoubleArray(x.size) { if (withReplacement) t else (N * t - Sp[it]) / (N - j[it] + 1) }
+        val m = DoubleArray(x.size) {
+            val m1 = (N * t - Sp[it])
+            val m2 = (N - j[it] + 1)
+            val m3 = m1 / m2
+            if (isFinite) (N * t - Sp[it]) / (N - j[it] + 1) else t
+        }
         return CumulativeSum(Sp, Stot, j, m)
     }
 
@@ -484,10 +523,8 @@ class AlphaMart(val N: Int, val withReplacement: Boolean, val t: Double, val u: 
         ----------
         x: input data
         kwargs:
-            eta: float in (t, u) (default u*(1-eps))
-                alternative hypothethesized value for the population mean
-            u: float > 0 (default 1)
-                upper bound on the population values
+            eta: float in (t, u) (default u*(1-eps)) alternative hypothethesized value for the population mean
+            u: float > 0 (default 1) upper bound on the population values
         */
         // TODO eta based on ulp
         //        ulp = np.finfo(float).eps
@@ -505,6 +542,8 @@ class AlphaMart(val N: Int, val withReplacement: Boolean, val t: Double, val u: 
         //        return m
 
         val (_, _, _, m) = this.sjm(N, eta, x)
+
+        // must be in [0,u]
         val negs = m.filter { it < 0.0 }
         if (negs.count() > 0) {
             println("Implied population mean is negative in ${negs.size} of ${x.size} terms")

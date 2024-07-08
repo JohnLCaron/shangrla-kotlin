@@ -6,6 +6,8 @@ import kotlin.math.min
 import kotlin.random.Random
 
 typealias TestFn = (x: DoubleArray) -> Pair<Double, DoubleArray>
+
+// Estimator of the true mean (theta)
 typealias EstimatorFn = (x: DoubleArray) -> DoubleArray
 typealias BetFn = (x: DoubleArray) -> DoubleArray
 
