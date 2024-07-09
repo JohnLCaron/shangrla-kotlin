@@ -2,6 +2,7 @@ package org.cryptobiotic.start
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class TestNonnegMean {
@@ -25,18 +26,12 @@ class TestNonnegMean {
         val t = .5
         val u = 1.0
         val d = 10.0
-        val c = (eta - t) / 2
 
         // class AlphaMart(val N: Int, val withReplacement: Boolean, val t: Double, val u: Double, val estimFnType: EstimFnType) : TestFn {
         val alphamart = AlphaMart(N = 1_000_000, withReplacement = false, t = t, u = u, estimFnType = EstimFnType.FIXED)
         val (p, p_history) = alphamart.test(s1)
         assertEquals(1.0, p)
         println("testAlphaMartAllHalf p_history=${p_history.contentToString()}")
-
-        println("\nAlphaAlgorithm")
-        val alpha = AlphaAlgorithm(N = 100, d = d, withoutReplacement = false)
-        val sampler = SampleFromList(s1)
-        alpha.run(s1.size) { sampler.sample() }
     }
 
     @Test
@@ -45,26 +40,23 @@ class TestNonnegMean {
         // np.testing.assert_array_less(test.alpha_mart(s)[1][1:],[eps]*(len(s)-1))
         val eta = .5
         val s1 = DoubleArray(5) { eta }
-        val t = .5
         val u = 1.0
-        val d = 10.0
-        val c = (eta - t) / 2
 
         val eps = 0.0001  // Generic small value
         val alphamart = AlphaMart(N = 1_000_000, withReplacement = false, t = eps, u = u, estimFnType = EstimFnType.FIXED)
         val (_, p_history) = alphamart.test(s1)
         p_history.forEach { it < eps * (s1.size - 1) }
         println("testAlphaMartEps p_history=${p_history.contentToString()}")
+
+        // 3.99920016e-04 1.59136578e-07 6.30056727e-11 2.48193829e-14 9.72731098e-18
+        doublesAreClose(listOf(3.99920016e-04, 1.59136578e-07, 6.30056727e-11, 2.48193829e-14, 9.72731098e-18), p_history.toList())
     }
 
     @Test
     fun testAlphaMartU2() {
         val eps = 0.0001  // Generic small value
-        val eta = .5
         val u = 2.0
-        val d = 10.0
         val t = eps
-        val c = (eta - t) / 2
 
         //        s = [0.6,0.8,1.0,1.2,1.4]
         //        test.u=2 # TODO eta not recalculated
@@ -75,46 +67,38 @@ class TestNonnegMean {
         p_history.forEach { it < eps * (s2.size - 1) }
         println("testAlphaMartU2 p_history=${p_history.contentToString()}")
 
+        // 3.33277787e-04 8.28092659e-08 1.63283887e-11 2.65587174e-15 3.65726954e-19
+        doublesAreClose(listOf(3.33277787e-04, 8.28092659e-08, 1.63283887e-11, 2.65587174e-15, 3.65726954e-19), p_history.toList())
     }
 
-        /*
-            s1 = [1, 0, 1, 1, 0, 0, 1]
-    //        test.u=1
-    //        test.N = 7
-    //        test.t = 3/7
-    //        alpha_mart1 = test.alpha_mart(s1)[1]
-    //        # p-values should be big until the last, which should be 0
-    //        print(f'{alpha_mart1=}')
-    //        assert(not any(np.isnan(alpha_mart1)))
-    //        assert(alpha_mart1[-1] == 0)
-    val s3 = doubleArrayOf(1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0)
-    val test3 = NonnegMean(N = 7, u = 1.0, t = 3.0 / 7)
-    val (_, p3_history)  = test3.alpha_mart(s3)
-    // p-values should be big until the last, which should be 0
-    // assert(not any (np.isnan(alpha_mart1)))
-    p3_history.forEach{ !it.isNaN() }
-    assert(p3_history.last() == 0.0)
+    @Test
+    fun test_lastObs() {
+        val u = 1.0
+        val t = 3.0 / 7.0
 
-    //         s2 = [1, 0, 1, 1, 0, 0, 0]
-    //        alpha_mart2 = test.alpha_mart(s2)[1]
-    //        # Since s1 and s2 only differ in the last observation,
-    //        # the resulting martingales should be identical up to the next-to-last.
-    //        # Final entry in alpha_mart2 should be 1
-    //        assert(all(np.equal(alpha_mart2[0:(len(alpha_mart2)-1)],
-    //                            alpha_mart1[0:(len(alpha_mart1)-1)])))
-    //        print(f'{alpha_mart2=}')
-    val s4 = doubleArrayOf(1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0)
-    val (_, p4_history) = test3.alpha_mart(s4)
-    // Since s3 and s4 only differ in the last observation,
-    // the resulting martingales should be identical up to the next-to-last.
-    // Final entry in alpha_mart2 should be 1
-    assertEquals(p3_history.size, p4_history.size)
-    repeat(p3_history.size-1) { assertEquals(p3_history[it], p4_history[it])}
-    assertEquals(1.0, p4_history.last())
-    println("p3_history=${p3_history.contentToString()}")
-    println("p4_history=${p4_history.contentToString()}")
+        val alphamart = AlphaMart(N = 7, withReplacement = false, t = t, u = u, estimFnType = EstimFnType.FIXED)
 
-     */
+        val s1 = doubleArrayOf(1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0)
+        val (_, alpha_mart1) = alphamart.test(s1)
+        // p - values should be big until the last, which should be 0
+        println("test_lastObs alpha_mart1=${alpha_mart1.contentToString()}")
+        assertNull(alpha_mart1.find { it == Double.POSITIVE_INFINITY})
+        assertEquals(0.0, alpha_mart1.last())
+
+         // alpha_mart1=array([0.6, 1. , 0.6, 0.2, 1. , 1. , 0. ])
+        // test_lastObs alpha_mart1=[0.6000000000000001, 1.0, 0.6000000000000001, 0.20000000000000007, 1.0, 1.0, 0.0]
+        doublesAreClose(listOf(0.6, 1.0 , 0.6, 0.2, 1.0 , 1.0 , 0.0), alpha_mart1.toList())
+
+        val s2 = doubleArrayOf(1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0)
+        val (_, alpha_mart2) = alphamart.test(s2)
+
+        println("test_lastObs alpha_mart1=${alpha_mart2.contentToString()}")
+        assertNull(alpha_mart2.find { it == Double.POSITIVE_INFINITY})
+        assertEquals(1.0, alpha_mart2.last())
+
+        // alpha_mart2=array([0.6, 1. , 0.6, 0.2, 1. , 1. , 1. ])
+        doublesAreClose(listOf(0.6, 1.0 , 0.6, 0.2, 1.0 , 1.0 , 1.0), alpha_mart2.toList())
+    }
 
     class SampleFromList(val list: DoubleArray) {
         var index = 0

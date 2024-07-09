@@ -1,13 +1,13 @@
 package org.cryptobiotic.start
 
 import org.cryptobiotic.shangrla.core.numpy_cumsum
+import org.cryptobiotic.shangrla.core.numpy_isclose
 import org.cryptobiotic.start.AlphaMart.CumulativeSum
-import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.sqrt
 
 //         return AlgoValues(etajsa, populationMeanValues, tjs, tjs
-data class AlgoValues(val etaj: List<Double>, val populationMeanValues: List<Double>, val tjs: List<Double>, val tstat: List<Double>)
+data class AlgoValues(val etaj: List<Double>, val populationMeanValues: List<Double>, val tjs: List<Double>,
+                      val tstat: List<Double>, val phistory: List<Double>)
 
 
 // ALPHA paper, section 3
@@ -58,7 +58,7 @@ class AlphaAlgorithm(
         var sampleNumber = 0
         var testStatistic = 1.0
         var sampleSum = 0.0
-        var populationMean = .5
+        var alternativeFixedMean = .5
 
         // Let
         //  theta = 1/N * Sum(xj)
@@ -69,7 +69,7 @@ class AlphaAlgorithm(
         //  eta_j := eta_j(X^j−1) estimate of the population mean, (depends on X^j−1, but not on x_k for k ≥ j)
 
         val sampleAssortValues = mutableListOf<Double>()
-        val populationMeanValues = mutableListOf<Double>()
+        val sampleMeanValues = mutableListOf<Double>()
         val etajsa = mutableListOf<Double>()
         val tjs = mutableListOf<Double>()
         val tstat = mutableListOf<Double>()
@@ -83,41 +83,34 @@ class AlphaAlgorithm(
             // – Determine Xj by applying the assorter to the selected ballot card (and the CVR, for comparison audits)
             val xj: Double = drawSample()
             sampleAssortValues.add(xj)
-            val sampleMean = sampleAssortValues.average()
+            // val sampleMean = sampleAssortValues.average()
             sampleNumber++
-            sampleSum += xj // – S ← S + Xj
 
-            val m = this.sjm2(N, t, sampleAssortValues.toDoubleArray(), sampleNumber)
-            populationMeanValues.add(m)
+            //// use previous sample sum
+            // fixed alternative that the original population mean is t
+            alternativeFixedMean = this.alternativeFixedMean(t, sampleNumber, sampleSum)
+            sampleMeanValues.add(alternativeFixedMean)
 
-            val eta = (t + (upperBound - t) / 2) // initial estimate of the population mean
-            val etajs = this.fixedAlternativeMean(sampleAssortValues.toDoubleArray(), eta) // estimFixed returns single "fixed" value; estimOptimal an array of size x
-            val etaj = etajs.last()
+            // fixed alternative that the original population mean is eta
+            val eta = (t + (upperBound - t) / 2)
+            val etaj = this.alternativeFixedMean(eta, sampleNumber, sampleSum)
             etajsa.add(etaj)
 
-            // estimate the populationMean
-            //     fun updateEta(c: Double, d: Double, eta0: Double, sumkm1: Double, sampleNum: Int, populationMean: Double, upperBound: Double) : Double {
-            // val etaj : Double = truncShrinkage(c=c, d=d, eta0=eta0, sumkm1=sampleSum, sampleNum=sampleNumber) // , populationMean=populationMean, upperBound=upperBound)
+            sampleSum += xj // – S ← S + Xj
 
+            // estimate of the populationMean
             // – If m < 0, T ← ∞. Otherwise, T ← T / u * ( Xj * η(j,S)/m + (u - Xj) * (u−η(j,S))/(u-m))
             // TODO This is eq 4 of ALPHA, p.5 :
             //      T_j = T_j-1 * (X_j * eta_j / µ_j + (u - X_j) * (u - eta_j) / ( u - µ_j)) / u
             // python:  terms = np.cumprod((x * etaj / m + (u - x) * (u - etaj) / (u - m)) / u)
-            // python: m = µ_j = The mean of the population after each draw if the null hypothesis is true. TODO mean of the sample?
+            // python: m = µ_j = The mean of the population after each draw if the null hypothesis is true.
             //          m = ( (N * t - S) / (N - j + 1) if np.isfinite(N) else t )  # mean of population after (j-1)st
-            //        draw, if null is true (t=eta is the mean)
+            //        draw, if null is true
             // u = upperBound
             // m = The mean of the population after each draw if the null hypothesis is true.
 
-            //val m2 = (N * t - sampleSum)
-            //val m3 = (N - sampleNumber + 1)
-            //val m4 = m2 / m3
-
-            //val epsi = c / sqrt(d + sampleNumber - 1)
-            //val etajBounded = min( max(epsi + populationMean, etaj), upperBound)
-
-            val tj = if (m < 0.0) Double.POSITIVE_INFINITY else {
-                (xj * etaj / m + (upperBound - xj) * (upperBound - etaj) / (upperBound - m))/ upperBound
+            val tj = if (alternativeFixedMean < 0.0) Double.POSITIVE_INFINITY else {
+                (xj * etaj / alternativeFixedMean + (upperBound - xj) * (upperBound - etaj) / (upperBound - alternativeFixedMean))/ upperBound
             }
             tjs.add(tj)
             testStatistic *= tj
@@ -128,32 +121,52 @@ class AlphaAlgorithm(
             // – If the sample is drawn without replacement, m ← (N/2 − S)/(N − j + 1)
             //   m = ( (N * t - S) / (N - j + 1) if np.isfinite(N) else t )  # mean of population after (j-1)st
             if (withoutReplacement) {
-                populationMean = (.5*N - sampleSum)/(N - sampleNumber + 1)
-                if (populationMean < 0.0)
+                alternativeFixedMean = (.5*N - sampleSum)/(N - sampleNumber + 1)
+                if (alternativeFixedMean < 0.0)
                     println("wtf")
             }
 
             // – If desired, break and conduct a full hand count instead of continuing to audit.
         }
         println(" etajs ${etajsa}")
-        println(" populationMeanValues ${populationMeanValues}")
+        println(" populationMeanValues ${sampleMeanValues}")
         println(" tjs ${tjs}")
+
+        //// exceptional conditions
+        // terms[m > u] = 0  # true mean is certainly less than hypothesized
+        repeat(tstat.size) { if (sampleMeanValues[it] > upperBound) tstat[it] = 0.0 } // true mean is certainly less than hypothesized
+
+        // terms[np.isclose(0, m, atol=atol)] = 1  # ignore
+        repeat(tstat.size) { if (numpy_isclose(0.0, sampleMeanValues[it])) tstat[it] = 1.0 } // ignore
+
+        // terms[np.isclose(0, terms, atol=atol)] = ( 1 } # martingale effectively vanishes; p-value 1
+        repeat(tstat.size) { if (numpy_isclose(0.0, tstat[it])) tstat[it] = 1.0 } // martingale effectively vanishes; p-value 1
+
+        // terms[m < 0] = np.inf  # true mean certainly greater than hypothesized
+        repeat(tstat.size) { if (sampleMeanValues[it] < 0.0) tstat[it] = Double.POSITIVE_INFINITY } // true mean is certainly less than hypothesized
+
+        // terms[-1] = ( np.inf if Stot > N * t else terms[-1] )  # final sample makes the total greater than the null
+        if (sampleSum > N * t) tstat[tstat.size - 1] = Double.POSITIVE_INFINITY // final sample makes the total greater than the null
+
         println(" tstat ${tstat}")
+
+        // return min(1, 1 / np.max(terms)), np.minimum(1, 1 / terms)
+        val phistory = tstat.map { min(1.0, 1.0 / it) }
+        // val p = min(1.0, 1.0 / tstat.max()) // seems wrong
+        println(" phistory ${phistory}")
 
         //
         //• If a full hand count is conducted, its results replace the reported results if they differ.
-        return AlgoValues(etajsa, populationMeanValues, tjs, tstat)
+        return AlgoValues(etajsa, sampleMeanValues, tjs, tstat, phistory)
     }
 
+    // Compute the alternative mean just before the jth draw, for a fixed alternative that the original population mean is eta. ??
     // sampleNum starts at 1
-    fun sjm2(N: Int, t: Double, x: DoubleArray, sampleNum: Int): Double {
-        val cum_sum = numpy_cumsum(x)
-        val S = DoubleArray(x.size+1) { if (it == 0) 0.0 else cum_sum[it-1] }   // 0, x_1, x_1+x_2, ...,
-        val Sp = DoubleArray(x.size) { S[it] } // same length as the data.
-
-        return if (!withoutReplacement) t else {
-            (N * t - Sp[sampleNum]) / (N - sampleNum)
-        }
+    fun alternativeFixedMean(t: Double, sampleNum: Int, sampleSumM1: Double): Double {
+        val m1 = (N * t - sampleSumM1)
+        val m2 = (N - sampleNum + 1)
+        m1 / m2
+        return (N * t - sampleSumM1) / (N - sampleNum + 1)
     }
 
     fun run(maxSample: Int, drawSample : () -> Double) : AlgoValues {
@@ -201,7 +214,7 @@ class AlphaAlgorithm(
             populationMeanValues.add(m)
 
             val eta = (t + (upperBound - t) / 2) // initial estimate of the population mean
-            val etajs = this.fixedAlternativeMean(sampleAssortValues.toDoubleArray(), eta) // estimFixed returns single "fixed" value; estimOptimal an array of size x
+            val etajs = this.fixedAlternativeMean(sampleAssortValues.toDoubleArray(), eta)
             val etaj = etajs.last()
             etajsa.add(etaj)
 
@@ -248,11 +261,15 @@ class AlphaAlgorithm(
         println(" etajs ${etajsa}")
         println(" populationMeanValues ${populationMeanValues}")
         println(" tjs ${tjs}")
+
         println(" tstat ${tstat}")
+
+        val phistory = tstat.map { min(1.0, 1.0 / it) }
+        println(" phistory ${phistory}")
 
         //
         //• If a full hand count is conducted, its results replace the reported results if they differ.
-        return AlgoValues(etajsa, populationMeanValues, tjs, tstat)
+        return AlgoValues(etajsa, populationMeanValues, tjs, tstat, phistory)
     }
 
     fun setEta0() : Double {
@@ -307,6 +324,20 @@ class AlphaAlgorithm(
         return CumulativeSum(Sp, Stot, j, m)
     }
 
+    // Compute the alternative mean just before the jth draw, for a fixed alternative that the original population mean is eta.
+    fun fixedAlternativeMean(x: DoubleArray, eta: Double): DoubleArray {
+        val (_, _, _, m) = this.sjmFromFixed(N, eta, x)
+        val negs = m.filter { it < 0.0 }
+        if (negs.count() > 0) {
+            println("Implied population mean is negative in ${negs.size} of ${x.size} terms")
+        }
+        val pos = m.filter { it > upperBound}
+        if (pos.count() > 0) {
+            println("Implied population mean is greater than ${upperBound} in ${pos.size} of ${x.size} terms")
+        }
+        return m
+    }
+
     fun sjmFromFixed(N: Int, t: Double, x: DoubleArray): CumulativeSum {
         val cum_sum = numpy_cumsum(x)
         val S = DoubleArray(x.size+1) { if (it == 0) 0.0 else cum_sum[it-1] }   // 0, x_1, x_1+x_2, ...,
@@ -327,18 +358,5 @@ class AlphaAlgorithm(
             // if (!withoutReplacement) t else (N * t - Sp[it]) / (N - j[it] + 1)
         }
         return CumulativeSum(Sp, Stot, j, m)
-    }
-
-    fun fixedAlternativeMean(x: DoubleArray, eta: Double): DoubleArray {
-        val (_, _, _, m) = this.sjmFromFixed(N, eta, x)
-        val negs = m.filter { it < 0.0 }
-        if (negs.count() > 0) {
-            println("Implied population mean is negative in ${negs.size} of ${x.size} terms")
-        }
-        val pos = m.filter { it > upperBound}
-        if (pos.count() > 0) {
-            println("Implied population mean is greater than ${upperBound} in ${pos.size} of ${x.size} terms")
-        }
-        return m
     }
 }

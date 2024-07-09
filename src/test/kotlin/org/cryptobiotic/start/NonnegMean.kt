@@ -410,7 +410,6 @@ class AlphaMart(val N: Int, val withReplacement: Boolean, val t: Double, val u: 
         // testStatistic = if (populationMean < 0.0) Double.POSITIVE_INFINITY else {
         //    (testStatistic / upperBound) * (xj * etaj / populationMean + (upperBound - xj) * (upperBound - etaj) / (upperBound - populationMean))
         // }
-        val tja = DoubleArray(x.size) { (x[it] * etaj[it] / m[it] + (u - x[it]) * (u - etaj[it]) / (u - m[it])) / u }
 
         // meed both m and eta
         val tj =
