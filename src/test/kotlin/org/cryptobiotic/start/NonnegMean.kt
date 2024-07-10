@@ -666,25 +666,28 @@ fun shrink_trunc(x: DoubleArray, minsd : Double, d: Int, eta: Double, f: Double,
         val (S, _Stot, j, m) = this.sjm(N, t, x)
         // Welford's algorithm for running mean and running sd
         val mj = mutableListOf<Double>()
-        mj.add(0.0)
+        mj.add(x[0])
         var sdj = mutableListOf<Double>()
         sdj.add(0.0)
+
+        //        for i, xj in enumerate(x[1:]):
+        //            mj.append(mj[-1] + (xj - mj[-1]) / (i + 1))
+        //            sdj.append(sdj[-1] + (xj - mj[-2]) * (xj - mj[-1]))
         // enumerate returns Pair(index, element)
-        x.forEachIndexed { idx, it ->
-            if (idx > 0) {
-                // mj.append(mj[-1] + (xj - mj[-1]) / (i + 1))
-                mj.add(mj.last() + (it - mj.last()) / (idx + 1))
-                // sdj.append(sdj[-1] + (xj - mj[-2]) * (xj - mj[-1]))
-                sdj.add(sdj.last() + (it - mj[idx - 2]) * (it - mj.last()))
-            }
+        for (idx in 0 until x.size-1) {
+            val xj = x[idx+1]
+            // mj.append(mj[-1] + (xj - mj[-1]) / (i + 1))
+            mj.add(mj.last() + (xj - mj.last()) / (idx + 1))
+            // sdj.append(sdj[-1] + (xj - mj[-2]) * (xj - mj[-1]))
+            sdj.add(sdj.last() + (xj - mj[mj.size - 2]) * (xj - mj.last()))
         }
         // sdj = np.sqrt(sdj / j)
-        val sdj2 = sdj.mapIndexed { idx, it -> sqrt(it / idx) }
+        val sdj2 = sdj.mapIndexed { idx, it -> sqrt(it / j[idx]) }
         // end of Welford's algorithm.
 
         // threshold the sd, set first two sds to 1
         // sdj = np.insert(np.maximum(sdj, minsd), 0, 1)[0:-1]
-        val sdj3 = DoubleArray(sdj2.size) { if (it < 2) 1.0 else max(sdj2[it-2], minsd) }
+        val sdj3 = DoubleArray(sdj2.size) { if (it < 2) 1.0 else max(sdj2[it-1], minsd) }
 
         // weighted = ((d * eta + S) / (d + j - 1) + u * f / sdj) / (1 + f / sdj)
         val weighted = sdj3.mapIndexed { idx, it -> ((d * eta + S[idx]) / (d + j[idx] - 1) + u * f / it) / (1 + f / it) }

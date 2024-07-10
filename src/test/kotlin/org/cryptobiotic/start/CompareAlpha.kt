@@ -1,17 +1,14 @@
 package org.cryptobiotic.start
 
 import org.cryptobiotic.shangrla.core.numpy_isclose
-import org.cryptobiotic.start.TestNonnegMean.SampleFromList
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class CompareAlpha {
-    val epsilon = .0000001
 
     @Test
-    fun testAlphaMartAllHalf() {
+    fun testAlphaMartAllHalf2() {
         //        # When all the items are 1/2, estimated p for a mean of 1/2 should be 1.
         //        s = np.ones(5)/2
         //        test = NonnegMean(N=int(10**6))
@@ -33,28 +30,6 @@ class CompareAlpha {
     }
 
     @Test
-    fun testAlphaMartAllHalf2() {
-        //        # When all the items are 1/2, estimated p for a mean of 1/2 should be 1.
-        //        s = np.ones(5)/2
-        //        test = NonnegMean(N=int(10**6))
-        //        np.testing.assert_almost_equal(test.alpha_mart(s)[0],1.0)
-        val eta = .5
-        val s1 = DoubleArray(5) { eta }
-        val t = .5
-        val u = 1.0
-        val d = 10.0
-
-        val alpha = AlphaAlgorithm(N = 100, d = d, withoutReplacement = false, upperBound=u, t=t)
-        val sampler = SampleFromList(s1)
-        val algoValues = alpha.run2(s1.size) { sampler.sample() }
-
-        // run 0.75, 0.75000025000025, 0.750000500001, 0.75000075000225, 0.750001000004
-        // run2 0.75, 0.7525252525252525, 0.7551020408163265, 0.7577319587628866, 0.7604166666666666
-        doublesAreClose(listOf(0.75, 0.7525252525252525, 0.7551020408163265, 0.7577319587628866, 0.7604166666666666), algoValues.etaj)
-        algoValues.phistory.forEach { assertEquals(1.0, it)}
-    }
-
-    @Test
     fun testAlphaMartEps() {
         val x = DoubleArray(5) { .5 }
         val d = 10.0
@@ -62,7 +37,7 @@ class CompareAlpha {
         println("\nAlphaAlgorithm")
         val alpha = AlphaAlgorithm(N = 1_000_000, d = d, withoutReplacement = false, t = .0001)
         val sampler = SampleFromList(x)
-        val algoValues = alpha.run2(x.size) { sampler.sample() }
+        val algoValues = alpha.run(x.size) { sampler.sample() }
 
         doublesAreEqual(listOf(0.50005, 0.50005000005, 0.5000500001000002, 0.5000500001500005, 0.5000500002000008), algoValues.etaj)
         doublesAreEqual(listOf(1.0E-4, 9.95000995000995E-5, 9.900019800039601E-5, 9.85002955008865E-5, 9.8000392001568E-5), algoValues.populationMeanValues)
@@ -82,7 +57,7 @@ class CompareAlpha {
 
         val alpha = AlphaAlgorithm(N = 1_000_000, d = d, withoutReplacement = false, t = .0001, upperBound = 2.0)
         val sampler = SampleFromList(x)
-        val algoValues = alpha.run2(x.size) { sampler.sample() }
+        val algoValues = alpha.run(x.size) { sampler.sample() }
 
         doublesAreEqual(listOf(1.00005, 1.0000504000504002, 1.0000506001012004, 1.0000506001518006, 1.0000504002016009), algoValues.etaj)
         doublesAreEqual(listOf(1.0E-4, 9.94000994000994E-5, 9.86001972003944E-5, 9.760029280087839E-5, 9.640038560154241E-5), algoValues.populationMeanValues)
@@ -102,7 +77,7 @@ class CompareAlpha {
         val alpha = AlphaAlgorithm(N = 7, d = d, withoutReplacement = false, t = t, upperBound = u)
         val x1 = doubleArrayOf(1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0)
         val sampler = SampleFromList(x1)
-        val algoValues = alpha.run2(x1.size) { sampler.sample() }
+        val algoValues = alpha.run(x1.size) { sampler.sample() }
 
         // test_lastObs()
         // etaj = [0.7142857142857142, 0.6666666666666665, 0.7999999999999998, 0.7499999999999998, 0.6666666666666664, 0.9999999999999996, 1.9999999999999991]
@@ -126,7 +101,7 @@ class CompareAlpha {
 
         val x2 = doubleArrayOf(1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0)
         val sampler2 = SampleFromList(x2)
-        val algoValues2 = alpha.run2(x2.size) { sampler2.sample() }
+        val algoValues2 = alpha.run(x2.size) { sampler2.sample() }
 
         doublesAreEqual(listOf(0.7142857142857142, 0.6666666666666665, 0.7999999999999998, 0.7499999999999998, 0.6666666666666664, 0.9999999999999996, 1.9999999999999991), algoValues2.etaj)
         doublesAreEqual(listOf(0.42857142857142855, 0.3333333333333333, 0.4, 0.25, 0.0, 0.0, 0.0), algoValues2.populationMeanValues)
@@ -136,8 +111,22 @@ class CompareAlpha {
     }
 }
 
+class SampleFromList(val list: DoubleArray) {
+    var index = 0
+    fun sample() = list[index++]
+}
 
 fun doublesAreClose(a: List<Double>, b: List<Double>, rtol: Double=1.0e-5, atol:Double=1.0e-8) {
+    //    For finite values, isclose uses the following equation to test whether
+    //    two floating point values are equivalent.
+    //
+    //     absolute(`a` - `b`) <= (`atol` + `rtol` * absolute(`b`))
+
+    assertEquals(a.size, b.size, "size differs")
+    repeat(a.size) { assertTrue(numpy_isclose(a[it], b[it], rtol, atol), "$it: ${a[it]} !~ ${b[it]}") }
+}
+
+fun doublesAreClose(a: DoubleArray, b: DoubleArray, rtol: Double=1.0e-5, atol:Double=1.0e-8) {
     //    For finite values, isclose uses the following equation to test whether
     //    two floating point values are equivalent.
     //

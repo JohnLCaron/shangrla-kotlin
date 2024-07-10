@@ -1,5 +1,7 @@
 package org.cryptobiotic.shangrla
 
+import kotlin.math.ln
+
 /*
 fun from_vote(vote: String, id: String, contest_id: String, phantom: Boolean = false): CVR {
     /*
@@ -21,3 +23,21 @@ fun from_vote(vote: String, id: String, contest_id: String, phantom: Boolean = f
 }
 
  */
+
+class Bernoulli(p: Double) {
+    val log_q = ln(1.0 - p)
+    val n = 1.0
+
+    fun get(): Double {
+        var x = 0.0
+        var sum = 0.0
+        while (true) {
+            val wtf = ln( Math.random()) / (n - x)
+            sum += wtf
+            if (sum < log_q) {
+                return x
+            }
+            x++
+        }
+    }
+}
