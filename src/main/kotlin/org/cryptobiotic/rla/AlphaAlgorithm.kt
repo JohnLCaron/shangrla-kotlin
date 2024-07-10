@@ -1,29 +1,31 @@
-package org.cryptobiotic.start
+package org.cryptobiotic.rla
 
 import org.cryptobiotic.shangrla.core.numpy_cumsum
 import org.cryptobiotic.shangrla.core.numpy_isclose
-import org.cryptobiotic.start.AlphaMart.CumulativeSum
 import kotlin.math.min
 
 //         return AlgoValues(etajsa, populationMeanValues, tjs, tjs
 data class AlgoValues(val etaj: List<Double>, val populationMeanValues: List<Double>, val tjs: List<Double>,
                       val tstat: List<Double>, val phistory: List<Double>)
 
+interface EstimFn {
+    // return eta estimate
+    fun eta(j: Int, sampleSum: Double): Double
+}
 
-// ALPHA paper, section 3
+// ALPHA paper, section 3, p.9
 class AlphaAlgorithm(
-    val risk_limit: Double = 0.05, // α ∈ (0, 1)
-    val withoutReplacement: Boolean = false,
-    val upperBound: Double = 1.0,  // aka u
+    val estimFn : EstimFn,
     val N: Int, // number of ballot cards in the population of cards from which the sample is drawn
-                // If N is np.inf, it means the sampling is with replacement
-
+                // (old) "If N is np.inf, it means the sampling is with replacement"
+    val withoutReplacement: Boolean = true,
+    val risk_limit: Double = 0.05, // α ∈ (0, 1)
+    val upperBound: Double = 1.0,  // aka u
+    val t: Double = 0.5,        // the hypothesized mean "under the null". TODO is it ever not 1/2 ?
     val isPolling: Boolean = false,
-    val d: Double,
-    val t: Double = 0.5,        // the hypothesized mean "under the null".
 ) {
-    var eta0 = setEta0()
-    val c = (eta0 - upperBound / 2)
+    //var eta0 = setEta0()
+    //val c = (eta0 - upperBound / 2)
 
     init {
         //• Set audit parameters:
@@ -58,7 +60,7 @@ class AlphaAlgorithm(
         var sampleNumber = 0
         var testStatistic = 1.0
         var sampleSum = 0.0
-        var alternativeFixedMean = .5
+        var populationMean = .5
 
         // Let
         //  theta = 1/N * Sum(xj)
@@ -87,9 +89,9 @@ class AlphaAlgorithm(
             sampleNumber++
 
             //// use previous sample sum
-            // fixed alternative that the original population mean is t
-            alternativeFixedMean = this.alternativeFixedMean(t, sampleNumber, sampleSum)
-            sampleMeanValues.add(alternativeFixedMean)
+            // population mean if theta = t
+            populationMean = this.populationMean(sampleNumber, sampleSum)
+            sampleMeanValues.add(populationMean)
 
             // fixed alternative that the original population mean is eta
             val eta = (t + (upperBound - t) / 2)
@@ -109,22 +111,24 @@ class AlphaAlgorithm(
             // u = upperBound
             // m = The mean of the population after each draw if the null hypothesis is true.
 
-            val tj = if (alternativeFixedMean < 0.0) Double.POSITIVE_INFINITY else {
-                (xj * etaj / alternativeFixedMean + (upperBound - xj) * (upperBound - etaj) / (upperBound - alternativeFixedMean))/ upperBound
+            val tj = if (populationMean < 0.0) Double.POSITIVE_INFINITY else {
+                (xj * etaj / populationMean + (upperBound - xj) * (upperBound - etaj) / (upperBound - populationMean))/ upperBound
             }
             tjs.add(tj)
             testStatistic *= tj
             println(" $sampleNumber = $xj etaj = $etaj tj=$tj, T = $testStatistic")
             tstat.add(testStatistic)
 
-            // update the population mean
+            /* update the population mean
             // – If the sample is drawn without replacement, m ← (N/2 − S)/(N − j + 1)
             //   m = ( (N * t - S) / (N - j + 1) if np.isfinite(N) else t )  # mean of population after (j-1)st
             if (withoutReplacement) {
-                alternativeFixedMean = (.5*N - sampleSum)/(N - sampleNumber + 1)
-                if (alternativeFixedMean < 0.0)
+                populationMean = (.5*N - sampleSum)/(N - sampleNumber + 1)
+                if (populationMean < 0.0)
                     println("wtf")
             }
+
+             */
 
             // – If desired, break and conduct a full hand count instead of continuing to audit.
         }
@@ -164,6 +168,13 @@ class AlphaAlgorithm(
     // sampleNum starts at 1
     fun alternativeFixedMean(t: Double, sampleNum: Int, sampleSumM1: Double): Double {
         return (N * t - sampleSumM1) / (N - sampleNum + 1)
+    }
+
+    // population mean under the null hypothesis that “the average of this list is not greater than 1/2”
+    // TODO seems to be the "mean of the remaining sample", which is why it depends on whether you are replacing or not
+    // TODO detect if it goes negetive
+    fun populationMean(sampleNum: Int, sampleSumM1: Double): Double {
+        return if (withoutReplacement) (N * t - sampleSumM1) / (N - sampleNum + 1) else t
     }
 
     fun setEta0() : Double {
@@ -216,5 +227,16 @@ class AlphaAlgorithm(
             // if (!withoutReplacement) t else (N * t - Sp[it]) / (N - j[it] + 1)
         }
         return CumulativeSum(Sp, Stot, j, m)
+    }
+
+    data class CumulativeSum(val S: DoubleArray, val Stot: Double, val indices: IntArray, val mean: DoubleArray)
+
+}
+
+// Compute the alternative mean just before the jth draw, for a fixed alternative that the original population mean is eta.
+// sampleNum starts at 1
+class FixedAlternativeMean(val N: Int, val eta0:Double): EstimFn {
+    override fun eta(j: Int, sampleSum: Double): Double {
+        return (N * eta0 - sampleSum) / (N - j + 1)
     }
 }

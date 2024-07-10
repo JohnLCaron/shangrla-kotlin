@@ -1,6 +1,6 @@
-package org.cryptobiotic.rla
+package org.cryptobiotic.simple
 
-import org.cryptobiotic.rla.CvrSimple.Companion.makeSimple
+import org.cryptobiotic.simple.CvrSimple.Companion.makeSimple
 import java.security.SecureRandom
 
 // always one plurality contest, always two candidates "A" and "B"

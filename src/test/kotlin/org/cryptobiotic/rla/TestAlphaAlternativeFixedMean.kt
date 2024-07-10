@@ -1,11 +1,25 @@
-package org.cryptobiotic.start
+package org.cryptobiotic.rla
 
 import org.cryptobiotic.shangrla.core.numpy_isclose
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class CompareAlpha {
+fun setEta0(upperBound: Double) : Double {
+    //    For polling audits, eta0 could be the reported mean value of the assorter.
+    //	    For instance, for the assertion corresponding to checking whether w got more votes than ℓ,
+    //	      η0 = (Nw + Nc/2)/N , where Nw is the number of votes reported for w , Nℓ is the
+    //	   number of votes reported for ℓ, and Nc = N − Nw − Nℓ is the number of ballot cards
+    //	   reported to have a vote for some other candidate or no valid vote in the contest.
+
+    //    For comparison audits, eta0 can be based on assumed or historical rates of overstatement errors.
+    val eps = 0.0001  // Generic small value
+    val eta0 = (eps + (upperBound - eps) / 2) // initial estimate of the population mean
+    return eta0
+}
+
+// Compare AlphaAlgorithm with output from start/TestNonnegMean
+class TestAlphaAlternativeFixedMean  {
 
     @Test
     fun testAlphaMartAllHalf2() {
@@ -13,13 +27,12 @@ class CompareAlpha {
         //        s = np.ones(5)/2
         //        test = NonnegMean(N=int(10**6))
         //        np.testing.assert_almost_equal(test.alpha_mart(s)[0],1.0)
-        val eta = .5
-        val s1 = DoubleArray(5) { eta }
-        val t = .5
+        val s1 = DoubleArray(5) { .5 }
         val u = 1.0
-        val d = 10.0
+        val N = 100
 
-        val alpha = AlphaAlgorithm(N = 100, d = d, withoutReplacement = false, upperBound=u, t=t)
+        val estimFn = FixedAlternativeMean(N, setEta0(u))
+        val alpha = AlphaAlgorithm(estimFn=estimFn, N=N, upperBound=u)
         val sampler = SampleFromList(s1)
         val algoValues = alpha.run(s1.size) { sampler.sample() }
 
@@ -31,11 +44,12 @@ class CompareAlpha {
 
     @Test
     fun testAlphaMartEps() {
+        val N = 1_000_000
+        val t = .0001
         val x = DoubleArray(5) { .5 }
-        val d = 10.0
 
-        println("\nAlphaAlgorithm")
-        val alpha = AlphaAlgorithm(N = 1_000_000, d = d, withoutReplacement = false, t = .0001)
+        val estimFn = FixedAlternativeMean(N, setEta0(1.0))
+        val alpha = AlphaAlgorithm(estimFn=estimFn, N=N, t=t)
         val sampler = SampleFromList(x)
         val algoValues = alpha.run(x.size) { sampler.sample() }
 
@@ -52,10 +66,14 @@ class CompareAlpha {
     //T = [3000.5, 1.2075943307116345E7, 6.1243030127749115E10, 3.76524207370759E14, 2.7342802820938455E18]
     @Test
     fun testAlphaMartU2() {
+        val N = 1_000_000
+        val u = 2.0
+        val t = .0001
         val x = doubleArrayOf(0.6, 0.8, 1.0, 1.2, 1.4)
-        val d = 10.0
 
-        val alpha = AlphaAlgorithm(N = 1_000_000, d = d, withoutReplacement = false, t = .0001, upperBound = 2.0)
+        val estimFn = FixedAlternativeMean(N, setEta0(u))
+        val alpha = AlphaAlgorithm(estimFn=estimFn, N=N, upperBound=u, t=t)
+
         val sampler = SampleFromList(x)
         val algoValues = alpha.run(x.size) { sampler.sample() }
 
@@ -70,12 +88,14 @@ class CompareAlpha {
     fun testLastObs() {
         //         s1 = [1, 0, 1, 1, 0, 0, 1]
         //        test = NonnegMean(N=7, u=1, t = 3/7)
+        val N = 7
         val u = 1.0
         val t = 3.0 / 7.0
-        val d = 10.0
-
-        val alpha = AlphaAlgorithm(N = 7, d = d, withoutReplacement = false, t = t, upperBound = u)
         val x1 = doubleArrayOf(1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0)
+
+        val estimFn = FixedAlternativeMean(N, setEta0(u))
+        val alpha = AlphaAlgorithm(estimFn=estimFn, N=N, upperBound=u, t=t)
+
         val sampler = SampleFromList(x1)
         val algoValues = alpha.run(x1.size) { sampler.sample() }
 

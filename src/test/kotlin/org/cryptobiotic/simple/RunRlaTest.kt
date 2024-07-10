@@ -1,4 +1,4 @@
-package org.cryptobiotic.rla
+package org.cryptobiotic.simple
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.cli.ArgParser
@@ -48,6 +48,6 @@ class RunRlaTest {
 
     @Test
     fun testRunTest() {
-        RunRlaTest.runTest(10, 1000)
+        runTest(10, 1000)
     }
 }

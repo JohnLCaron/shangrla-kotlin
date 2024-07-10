@@ -1,5 +1,6 @@
 package org.cryptobiotic.start
 
+import org.cryptobiotic.rla.doublesAreClose
 import org.cryptobiotic.shangrla.Bernoulli
 import kotlin.math.max
 import kotlin.math.min
@@ -186,6 +187,7 @@ class TestNonnegMean {
                 println("xfin = ${xfin.contentToString()}")
                 println("yfin = ${yfin.contentToString()}")
                 doublesAreClose(xfin, yfin)
+                println()
             }
         }
     }
