@@ -1,13 +1,8 @@
 package org.cryptobiotic.shangrla.core
 
-import org.cryptobiotic.shangrla.core.NonnegMean
-import org.cryptobiotic.shangrla.core.TestFnType
-import org.cryptobiotic.shangrla.core.numpy_isclose
 import java.lang.Math.log
 import java.lang.Math.pow
 import kotlin.math.ceil
-import kotlin.math.exp
-import kotlin.math.floor
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -16,33 +11,58 @@ class TestNonnegMean {
 
     @Test
     fun test_alpha_mart() {
-        val eps = 0.0001  // Generic small value
-
-        // When all the items are 1/2, estimated p for a mean of 1/2 should be 1.
+        //        # When all the items are 1/2, estimated p for a mean of 1/2 should be 1.
+        //        s = np.ones(5)/2
+        //        test = NonnegMean(N=int(10**6))
+        //        np.testing.assert_almost_equal(test.alpha_mart(s)[0],1.0)
         val s1 = DoubleArray(5) { .5 }
         val test = NonnegMean(N = 1_000_000)
         val (p, _) = test.alpha_mart(s1)
         assertEquals(1.0, p)
 
+        // test.t = eps
+        // np.testing.assert_array_less(test.alpha_mart(s)[1][1:],[eps]*(len(s)-1))
+        val eps = 0.0001  // Generic small value
         val test1 = NonnegMean(N = 1_000_000, t = eps)
         val (_, p_history) = test1.alpha_mart(s1)
-        p_history.forEach{ it < eps }
+        // p_history.forEach{ it < eps }
+        p_history.forEach{ it < eps * (s1.size - 1) }
 
+        //        s = [0.6,0.8,1.0,1.2,1.4]
+        //        test.u=2 # TODO eta not recalculated
+        //        np.testing.assert_array_less(test.alpha_mart(s)[1][1:],[eps]*(len(s)-1))
         val s2 = doubleArrayOf(0.6, 0.8, 1.0, 1.2, 1.4)
         val test2 = NonnegMean(N = 1_000_000, u = 2.0)
-        val (p2, p2_history) = test2.alpha_mart(s2)
-        p2_history.forEach{ it < eps }
+        val (_, p2_history) = test2.alpha_mart(s2)
+        p2_history.forEach{ it < eps * (s2.size - 1)}
 
+        //       s1 = [1, 0, 1, 1, 0, 0, 1]
+        //        test.u=1
+        //        test.N = 7
+        //        test.t = 3/7
+        //        alpha_mart1 = test.alpha_mart(s1)[1]
+        //        # p-values should be big until the last, which should be 0
+        //        print(f'{alpha_mart1=}')
+        //        assert(not any(np.isnan(alpha_mart1)))
+        //        assert(alpha_mart1[-1] == 0)
         val s3 = doubleArrayOf(1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0)
         val test3 = NonnegMean(N = 7, u = 1.0, t = 3.0 / 7)
-        val (p3, p3_history)  = test3.alpha_mart(s3)
+        val (_, p3_history)  = test3.alpha_mart(s3)
         // p-values should be big until the last, which should be 0
         // assert(not any (np.isnan(alpha_mart1)))
         p3_history.forEach{ !it.isNaN() }
         assert(p3_history.last() == 0.0)
 
+        //         s2 = [1, 0, 1, 1, 0, 0, 0]
+        //        alpha_mart2 = test.alpha_mart(s2)[1]
+        //        # Since s1 and s2 only differ in the last observation,
+        //        # the resulting martingales should be identical up to the next-to-last.
+        //        # Final entry in alpha_mart2 should be 1
+        //        assert(all(np.equal(alpha_mart2[0:(len(alpha_mart2)-1)],
+        //                            alpha_mart1[0:(len(alpha_mart1)-1)])))
+        //        print(f'{alpha_mart2=}')
         val s4 = doubleArrayOf(1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0)
-        val (p4, p4_history) = test3.alpha_mart(s4)
+        val (_, p4_history) = test3.alpha_mart(s4)
         // Since s3 and s4 only differ in the last observation,
         // the resulting martingales should be identical up to the next-to-last.
         // Final entry in alpha_mart2 should be 1

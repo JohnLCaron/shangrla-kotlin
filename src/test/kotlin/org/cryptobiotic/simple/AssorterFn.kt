@@ -1,4 +1,4 @@
-package org.cryptobiotic.rla
+package org.cryptobiotic.simple
 
 // An assorter A assigns a nonnegative value to each ballot card, depending on the marks
 // the voter made on that ballot card.

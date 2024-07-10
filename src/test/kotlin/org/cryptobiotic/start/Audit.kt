@@ -108,6 +108,17 @@ class Audit(
         return min_margin
     }
 
+    fun set_all_margins_from_tallies(contests: List<Contest>): Double {
+        var min_margin = Double.POSITIVE_INFINITY
+        for (con in contests) {
+            for ((_,asn) in con.assertions) {
+                val margin = asn.set_margin_from_tally()
+                min_margin = min(min_margin, margin)
+            }
+        }
+        return min_margin
+    }
+
     // use_styles or mvr_sample, from previous?
     fun find_sample_size(
         contests: List<Contest>,

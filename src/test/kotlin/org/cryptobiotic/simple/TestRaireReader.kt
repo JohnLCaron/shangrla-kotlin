@@ -1,8 +1,6 @@
-package org.cryptobiotic.shangrla.reader
+package org.cryptobiotic.simple
 
 import org.cryptobiotic.shangrla.reader.readRaireBallots
-import org.cryptobiotic.shangrla.reader.makeCvrsFromRaireBallots
-import org.cryptobiotic.shangrla.reader.makeCvrsFromRaireBallotsPlurality
 import kotlin.test.Test
 
 class TestRaireReader {

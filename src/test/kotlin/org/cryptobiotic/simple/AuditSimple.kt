@@ -1,4 +1,4 @@
-package org.cryptobiotic.rla
+package org.cryptobiotic.simple
 
 import kotlin.math.ceil
 import kotlin.math.max
