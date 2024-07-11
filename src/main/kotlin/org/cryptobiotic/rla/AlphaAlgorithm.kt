@@ -1,16 +1,21 @@
 package org.cryptobiotic.rla
 
+import org.cryptobiotic.rla.AlphaAlgorithm.CumulativeSum
 import org.cryptobiotic.shangrla.core.numpy_cumsum
 import org.cryptobiotic.shangrla.core.numpy_isclose
+import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.sqrt
 
 //         return AlgoValues(etajsa, populationMeanValues, tjs, tjs
 data class AlgoValues(val etaj: List<Double>, val populationMeanValues: List<Double>, val tjs: List<Double>,
                       val tstat: List<Double>, val phistory: List<Double>)
 
+// estimate the population mean for the jth sample from the previous j-1 samples
 interface EstimFn {
     // return eta estimate
-    fun eta(j: Int, sampleSum: Double): Double
+    // dont pass the empty list, start with j = 2 with prevSamples.size = 1
+    fun eta(prevSamples: List<Double>): Double
 }
 
 // ALPHA paper, section 3, p.9
@@ -84,32 +89,31 @@ class AlphaAlgorithm(
             // – Draw a ballot at random
             // – Determine Xj by applying the assorter to the selected ballot card (and the CVR, for comparison audits)
             val xj: Double = drawSample()
-            sampleAssortValues.add(xj)
             // val sampleMean = sampleAssortValues.average()
             sampleNumber++
 
             //// use previous sample sum
-            // population mean if theta = t
             populationMean = this.populationMean(sampleNumber, sampleSum)
             sampleMeanValues.add(populationMean)
 
-            // fixed alternative that the original population mean is eta
-            val eta = (t + (upperBound - t) / 2)
-            val etaj = this.alternativeFixedMean(eta, sampleNumber, sampleSum)
+            //// use previous sample list
+            val etaj = estimFn.eta(sampleAssortValues)
             etajsa.add(etaj)
 
+            sampleAssortValues.add(xj)
             sampleSum += xj // – S ← S + Xj
 
-            // estimate of the populationMean
+            // T is the "ALPHA supermartingale"
             // – If m < 0, T ← ∞. Otherwise, T ← T / u * ( Xj * η(j,S)/m + (u - Xj) * (u−η(j,S))/(u-m))
             // TODO This is eq 4 of ALPHA, p.5 :
             //      T_j = T_j-1 * (X_j * eta_j / µ_j + (u - X_j) * (u - eta_j) / ( u - µ_j)) / u
             // python:  terms = np.cumprod((x * etaj / m + (u - x) * (u - etaj) / (u - m)) / u)
             // python: m = µ_j = The mean of the population after each draw if the null hypothesis is true.
-            //          m = ( (N * t - S) / (N - j + 1) if np.isfinite(N) else t )  # mean of population after (j-1)st
-            //        draw, if null is true
+            //          m = ( (N * t - S) / (N - j + 1) if np.isfinite(N) else t )  # mean of population after (j-1)st draw, if null is true
+            // X_j = jthe sample
+            // eta_j = estimate of population mean = eta(X^j-a)
             // u = upperBound
-            // m = The mean of the population after each draw if the null hypothesis is true.
+            // µ_j = m = The mean of the population after each draw if the null hypothesis is true.
 
             val tj = if (populationMean < 0.0) Double.POSITIVE_INFINITY else {
                 (xj * etaj / populationMean + (upperBound - xj) * (upperBound - etaj) / (upperBound - populationMean))/ upperBound
@@ -127,7 +131,6 @@ class AlphaAlgorithm(
                 if (populationMean < 0.0)
                     println("wtf")
             }
-
              */
 
             // – If desired, break and conduct a full hand count instead of continuing to audit.
@@ -164,30 +167,11 @@ class AlphaAlgorithm(
         return AlgoValues(etajsa, sampleMeanValues, tjs, tstat, phistory)
     }
 
-    // Compute the alternative mean just before the jth draw, for a fixed alternative that the original population mean is eta. ??
-    // sampleNum starts at 1
-    fun alternativeFixedMean(t: Double, sampleNum: Int, sampleSumM1: Double): Double {
-        return (N * t - sampleSumM1) / (N - sampleNum + 1)
-    }
-
     // population mean under the null hypothesis that “the average of this list is not greater than 1/2”
     // TODO seems to be the "mean of the remaining sample", which is why it depends on whether you are replacing or not
     // TODO detect if it goes negetive
     fun populationMean(sampleNum: Int, sampleSumM1: Double): Double {
         return if (withoutReplacement) (N * t - sampleSumM1) / (N - sampleNum + 1) else t
-    }
-
-    fun setEta0() : Double {
-        //    For polling audits, eta0 could be the reported mean value of the assorter.
-        //	    For instance, for the assertion corresponding to checking whether w got more votes than ℓ,
-        //	      η0 = (Nw + Nc/2)/N , where Nw is the number of votes reported for w , Nℓ is the
-        //	   number of votes reported for ℓ, and Nc = N − Nw − Nℓ is the number of ballot cards
-        //	   reported to have a vote for some other candidate or no valid vote in the contest.
-
-        //    For comparison audits, eta0 can be based on assumed or historical rates of overstatement errors.
-        val eps = 0.0001  // Generic small value
-        val eta0 = (eps + (upperBound - eps) / 2) // initial estimate of the population mean
-        return eta0
     }
 
     fun truncShrinkage(c: Double, d: Double, eta0: Double, sumkm1: Double, sampleNum: Int) : Double {
@@ -208,35 +192,153 @@ class AlphaAlgorithm(
         return result
     }
 
-    fun sjm(N: Int, t: Double, x: DoubleArray): CumulativeSum {
-        val cum_sum = numpy_cumsum(x)
-        val S = DoubleArray(x.size+1) { if (it == 0) 0.0 else cum_sum[it-1] }   // 0, x_1, x_1+x_2, ...,
-        val Stot = S.last()  // sample total ""array[-1] means the last element"
-        val Sp = DoubleArray(x.size) { S[it] } // same length as the data.
-
-//        j = np.arange(1, len(x) + 1)  # 1, 2, 3, ..., len(x)
-//        assert j[-1] <= N, "Sample size is larger than the population!"
-        val j = IntArray(x.size) { it+1 } // 1, 2, 3, ..., len(x)
-        require( !withoutReplacement || x.size <= N) { "Sample size is larger than the population!" }
-//        m = ( (N * t - S) / (N - j + 1) if np.isfinite(N) else t )  # mean of population after (j-1)st draw, if null is true (t=eta is the mean)
-        // val m = if (withReplacement) doubleArrayOf(t) else DoubleArray(x.size) { (N * t - Sp[it]) / (N - j[it] + 1)  }
-        val m = DoubleArray(x.size) {
-            val m1 = (N * t - Sp[it])
-            val m2 = (N - j[it] + 1)
-            m1 / m2
-            // if (!withoutReplacement) t else (N * t - Sp[it]) / (N - j[it] + 1)
-        }
-        return CumulativeSum(Sp, Stot, j, m)
-    }
-
     data class CumulativeSum(val S: DoubleArray, val Stot: Double, val indices: IntArray, val mean: DoubleArray)
 
 }
 
 // Compute the alternative mean just before the jth draw, for a fixed alternative that the original population mean is eta.
-// sampleNum starts at 1
 class FixedAlternativeMean(val N: Int, val eta0:Double): EstimFn {
-    override fun eta(j: Int, sampleSum: Double): Double {
+
+    override fun eta(prevSamples: List<Double>): Double {
+        val j = prevSamples.size + 1
+        val sampleSum = prevSamples.sum()
         return (N * eta0 - sampleSum) / (N - j + 1)
+    }
+
+}
+
+class TruncShrinkage(val N: Int, val u: Double, val t: Double, val minsd : Double, val d: Int, val eta0: Double, val f: Double, val c: Double, val eps: Double): EstimFn {
+    val welford = Welford()
+
+    override fun eta(prevSamples: List<Double>): Double {
+        welford.update(prevSamples.last())
+        if (prevSamples.size == 1) return eta0
+
+        val (_, _, std) = welford.result()
+        val sdj3 = max(std, minsd)
+
+        val lastj = prevSamples.size
+        val sampleSum = prevSamples.sum()
+
+        val mean = mean(N, t, prevSamples)
+        val mean2 = mean2(N, t, prevSamples)
+        require(mean == mean2)
+
+        val weighted = ((d * eta0 + sampleSum) / (d + lastj - 1) + u * f / sdj3) / (1 + f / sdj3) // eq 14
+        val npmax = max( weighted, mean2 + c / sqrt((d + lastj - 1).toDouble()))
+        val gold = min(u * (1 - eps), npmax)
+        return gold
+    }
+
+    fun mean(N: Int, t: Double, x: List<Double>): Double {
+        val cum_sum = numpy_cumsum(x.toDoubleArray())
+        val S = DoubleArray(x.size+1) { if (it == 0) 0.0 else cum_sum[it-1] }   // 0, x_1, x_1+x_2, ...,
+        val Sp = DoubleArray(x.size) { S[it] } // same length as the data.
+
+        val j = IntArray(x.size) { it+1 } // 1, 2, 3, ..., len(x)
+        val m = DoubleArray(x.size) {
+            val m1 = (N * t - Sp[it])
+            val m2 = (N - j[it] + 1)
+            val m3 = m1 / m2
+            m3
+        }
+        return m.last()
+    }
+
+    fun mean2(N: Int, t: Double, x: List<Double>): Double {
+        val sum = x.subList(0, x.size-1).sum()
+        val m1 = (N * t - sum)
+        val m2 = (N - x.size + 1)
+        val m3 = m1 / m2
+        return m3
+    }
+
+    fun etaOld(prevSamples: List<Double>): Double {
+        // if (prevSamples.size == 0) return eta0
+
+        val mj = mutableListOf<Double>()
+        var sdj = mutableListOf<Double>()
+
+        //if (prevSamples.size == 1) {
+            mj.add(prevSamples[0])
+            sdj.add(0.0)
+        //}
+
+        // Welford's algorithm for running mean and running sd
+        val (S, _, j, m) = this.sjm(N, t, prevSamples)
+        // Welford's algorithm for running mean and running sd
+        //        for i, xj in enumerate(x[1:]):
+        //            mj.append(mj[-1] + (xj - mj[-1]) / (i + 1))
+        //            sdj.append(sdj[-1] + (xj - mj[-2]) * (xj - mj[-1]))
+        // enumerate returns Pair(index, element)
+        for (idx in 0 until prevSamples.size-1) {
+            val xj = prevSamples[idx+1]
+            // mj.append(mj[-1] + (xj - mj[-1]) / (i + 1))
+            mj.add(mj.last() + (xj - mj.last()) / (idx + 2)) // fixed by PR # 89
+            // sdj.append(sdj[-1] + (xj - mj[-2]) * (xj - mj[-1]))
+            sdj.add(sdj.last() + (xj - mj[mj.size - 2]) * (xj - mj.last()))
+        }
+        // sdj = np.sqrt(sdj / j)
+        val sdj2 = sdj.mapIndexed { idx, it -> sqrt(it / j[idx]) }
+        // end of Welford's algorithm.
+
+        // threshold the sd, set first two sds to 1
+        // sdj = np.insert(np.maximum(sdj, minsd), 0, 1)[0:-1]
+        val sdj3 = DoubleArray(sdj2.size) { if (it < 2) 1.0 else max(sdj2[it-1], minsd) }
+
+        // weighted = ((d * eta + S) / (d + j - 1) + u * f / sdj) / (1 + f / sdj)
+        val weighted = sdj3.mapIndexed { idx, it -> ((d * eta0 + S[idx]) / (d + j[idx] - 1) + u * f / it) / (1 + f / it) }
+
+        // return min(1, 1 / np.max(terms)), np.minimum(1, 1 / terms)
+        // np.minimum = element-wise minumum, presumably the smaller of 1 and 1/term
+        // np.max = maximum of an array
+        // min = min of an iterable
+        //val npmin = terms.map { min(1.0, 1.0 / it) }.toDoubleArray()
+        //val p = min(1.0, 1.0 / terms.max()) // seems wrong
+
+        // return np.minimum( u * (1 - np.finfo(float).eps), np.maximum(weighted, m + c / np.sqrt(d + j - 1)), )
+        val npmax = weighted.mapIndexed { idx, it ->  max( it, m[idx] + c / sqrt((d + j[idx] - 1).toDouble())) }
+        return npmax.map { min(u * (1 - eps), it) }.last()
+    }
+
+    fun sjm(N: Int, t: Double, x: List<Double>): CumulativeSum {
+        val cum_sum = numpy_cumsum(x.toDoubleArray())
+        val S = DoubleArray(x.size+1) { if (it == 0) 0.0 else cum_sum[it-1] }   // 0, x_1, x_1+x_2, ...,
+        val Stot = S.last()  // sample total ""array[-1] means the last element"
+        val Sp = DoubleArray(x.size) { S[it] } // same length as the data.
+
+        val j = IntArray(x.size) { it+1 } // 1, 2, 3, ..., len(x)
+        val m = DoubleArray(x.size) {
+            val m1 = (N * t - Sp[it])
+            val m2 = (N - j[it] + 1)
+            val m3 = m1 / m2
+            m3
+        }
+        println("   j = ${j.last()} m = ${m.last()}")
+        return CumulativeSum(Sp, Stot, j, m)
+    }
+}
+
+class Welford() {
+    var count = 0
+    var mean = 0.0 // mean accumulates the mean of the entire dataset
+    var M2 = 0.0 // M2 aggregates the squared distance from the mean
+
+    // For a new value new_value, compute the new count, new mean, the new M2.
+    fun update(new_value: Double) {
+        count++
+        val delta = new_value - mean
+        mean += delta / count
+        val delta2 = new_value - mean
+        M2 += delta * delta2
+    }
+
+    // Retrieve the mean, variance and sample variance from an aggregate
+    fun result() : Triple<Double, Double, Double> {
+        if (count < 2) return Triple(mean, Double.NaN, Double.NaN)
+        val variance = M2 / count
+        val sample_variance = M2 / (count - 1)
+        val std_dev = Math.sqrt(variance)
+        return Triple(mean, variance, std_dev)
     }
 }

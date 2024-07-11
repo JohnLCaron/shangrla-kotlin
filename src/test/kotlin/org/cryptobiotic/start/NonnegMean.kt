@@ -677,13 +677,18 @@ fun shrink_trunc(x: DoubleArray, minsd : Double, d: Int, eta: Double, f: Double,
         for (idx in 0 until x.size-1) {
             val xj = x[idx+1]
             // mj.append(mj[-1] + (xj - mj[-1]) / (i + 1))
-            mj.add(mj.last() + (xj - mj.last()) / (idx + 1))
+            mj.add(mj.last() + (xj - mj.last()) / (idx + 2)) // fixed in PR # 89
             // sdj.append(sdj[-1] + (xj - mj[-2]) * (xj - mj[-1]))
             sdj.add(sdj.last() + (xj - mj[mj.size - 2]) * (xj - mj.last()))
         }
         // sdj = np.sqrt(sdj / j)
-        val sdj2 = sdj.mapIndexed { idx, it -> sqrt(it / j[idx]) }
+        val sdj2 = sdj.mapIndexed { idx, it -> sqrt(it / j[idx]) } // j is the count
         // end of Welford's algorithm.
+
+        println("x = ${x.contentToString()}")
+        println("j = ${j.contentToString()}")
+        println("running mean = ${mj}")
+        println("running std = ${sdj2}")
 
         // threshold the sd, set first two sds to 1
         // sdj = np.insert(np.maximum(sdj, minsd), 0, 1)[0:-1]
