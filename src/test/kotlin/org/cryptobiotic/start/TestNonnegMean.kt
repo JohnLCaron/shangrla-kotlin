@@ -1,6 +1,7 @@
 package org.cryptobiotic.start
 
 import org.cryptobiotic.rla.doublesAreClose
+import org.cryptobiotic.rla.doublesAreEqual
 import org.cryptobiotic.shangrla.Bernoulli
 import kotlin.math.max
 import kotlin.math.min
@@ -8,6 +9,7 @@ import kotlin.math.sqrt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class TestNonnegMean {
     val eps = 0.0001  // Generic small value
@@ -114,8 +116,8 @@ class TestNonnegMean {
     //        f = 0
     //        vrand =  sp.stats.bernoulli.rvs(1/2, size=20)
     //        v = [
-    //            np.array([0, 0, 0, 0, 0, 1, 1, 1, 1, 1]),
-    //            np.array([1, 1, 1, 1, 1, 1, 0, 0, 0, 0]),
+    //            listOf(0, 0, 0, 0, 0, 1, 1, 1, 1, 1]),
+    //            listOf(1, 1, 1, 1, 1, 1, 0, 0, 0, 0]),
     //            vrand
     //        ]
     //        test_inf = NonnegMean(N=np.inf, t=t, u=u, d=d, f=f)
@@ -196,5 +198,45 @@ class TestNonnegMean {
     fun Sj(x: List<Double>, j:Int): Double = if (j == 1) 0.0 else x.subList(0,j-1).sum()
     fun tj(N:Int, t: Double, x: List<Double>, j:Int) =  (N*t-Sj(x, j))/(N-j+1)
 
+/*
+    @Test
+    fun test_sjm1() {
+        // test_sjm_with_replacement:
+        val test = NonnegMean(5, true)
+        val (S, Stot, j, m) = test.sjm(0.52, doubleArrayOf(1.0, 0.0, 0.5, 4.0, 0.5))
+        doublesAreEqual(S.toList(), listOf(0.0, 1.0, 1.0, 1.5, 5.5))
+        assertTrue(Stot == 6.0)
+        assertEquals(j.toList(), listOf(1, 2, 3, 4, 5))
+        doublesAreEqual(m.toList(), listOf(0.52, 0.52, 0.52, 0.52, 0.52))
+    }
+
+    @Test
+    fun test_sjm2() {
+        // test_sjm_without_replacement:
+        val test = NonnegMean()
+        val (S, Stot, j, m) = test.sjm(5, 1.53, doubleArrayOf(1.0, 2.0, 0.5, 1.0, 4.0))
+        doublesAreEqual(S, listOf(0.0, 1.0, 3.0, 3.5, 4.5))
+        assertTrue( Stot == 8.5)
+        assertEquals(j, listOf(1, 2, 3, 4, 5]))
+        doublesAreClose(m, listOf(1.53, 1.6625, 1.55, 2.075, 3.15))
+    }
+
+    @Test
+    fun test_sjm3() {
+        // test_sjm_with_sample_larger_than_population:
+        val test = NonnegMean()
+        with pytest . raises (AssertionError):
+        test.sjm(4, 0.55, listOf(1, 2, 3, 4, 5))
+    }
+
+    @Test
+    fun test_sjm4() {
+        // test_sjm_with_non_integer_population:
+        val test = NonnegMean()
+        with pytest . raises (AssertionError):
+        test.sjm(4.5, 0.56, listOf(1, 2, 3, 4, 5))
+    }
+
+ */
 }
 

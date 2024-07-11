@@ -286,34 +286,5 @@ class TestNonnegMean {
         }
     }
 
-    /*
-    fun test_sjm() {
-        // test_sjm_with_replacement:
-        test = NonnegMean()
-        S, Stot, j, m = test.sjm(np.inf, 0.52, np.array([1, 0, 0.5, 4, 0.5]))
-        np.testing.assert_array_equal(S, np.array([0, 1, 1, 1.5, 5.5]))
-        assert Stot == 6
-        np.testing.assert_array_equal(j, np.array([1, 2, 3, 4, 5]))
-        np.testing.assert_array_equal(m, np.array([0.52, 0.52, 0.52, 0.52, 0.52]))
 
-        // test_sjm_without_replacement:
-        test = NonnegMean()
-        S, Stot, j, m = test.sjm(5, 1.53, np.array([1, 2, 0.5, 1, 4]))
-        np.testing.assert_array_equal(S, np.array([0, 1, 3, 3.5, 4.5]))
-        assert Stot == 8.5
-        np.testing.assert_array_equal(j, np.array([1, 2, 3, 4, 5]))
-        np.testing.assert_array_almost_equal(m, np.array([1.53, 1.6625, 1.55, 2.075, 3.15]))
-
-        // test_sjm_with_sample_larger_than_population:
-        test = NonnegMean()
-        with pytest . raises (AssertionError):
-        test.sjm(4, 0.55, np.array([1, 2, 3, 4, 5]))
-
-        // test_sjm_with_non_integer_population:
-        test = NonnegMean()
-        with pytest . raises (AssertionError):
-        test.sjm(4.5, 0.56, np.array([1, 2, 3, 4, 5]))
-    }
-
-     */
 }

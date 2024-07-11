@@ -1,6 +1,7 @@
 package org.cryptobiotic.start
 
 import org.cryptobiotic.shangrla.core.*
+import org.cryptobiotic.start.AlphaMart.CumulativeSum
 import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
@@ -11,8 +12,13 @@ interface TestFn {
     fun test(x: DoubleArray): Pair<Double, DoubleArray>
 }
 
+interface EstimatorFn {
+    // return p, p_history
+    fun eta(x: DoubleArray): DoubleArray
+}
+
 // Estimator of the true mean (theta)
-typealias EstimatorFn = (x: DoubleArray) -> DoubleArray
+typealias EstimatorLambda = (x: DoubleArray) -> DoubleArray
 
 // Tests of the hypothesis that the mean of a population of values in [0, u] is less than or equal to t.
 // probably only need AlphaMart
@@ -28,6 +34,7 @@ enum class TestFnType {
 enum class EstimFnType {
     OPTIMAL,
     FIXED,
+    SHRINK_TRUNC,
 }
 
 // Tests of the hypothesis that the mean of a population of values in [0, u] is less than or equal to t
@@ -35,7 +42,7 @@ data class NonnegMean(
     val N: Int, // If N is np.inf, it means the sampling is with replacement
     val withReplacement: Boolean = false, // TODO
     val t: Double = 0.5,        // the hypothesized mean "under the null".
-    val u: Double = 1.0,        // mutable
+    val u: Double = 1.0,
     val testFn: TestFn
 ) {
     val isFinite = !withReplacement
@@ -372,15 +379,22 @@ class KaplanWald(val t: Double, val g: Double = 0.1, val random_order: Boolean =
 // method, for a population of size N, based on a series of draws x.
 //     u > 0 (default 1); upper bound on the population
 // estimFn: Estimation of the mean (aka eta_j)
-class AlphaMart(val N: Int, val withReplacement: Boolean, val t: Double, val u: Double, val estimFnType: EstimFnType) : TestFn {
-    val estimFn: EstimatorFn
+class AlphaMart(val N: Int, val withReplacement: Boolean, val t: Double, val u: Double, val estimFnType: EstimFnType? = null,
+                val estimFnOverride: EstimatorFn? = null,
+) : TestFn {
+    val estimFn: EstimatorLambda
     val isFinite = !withReplacement
 
     init {
         val eta = (t + (u - t) / 2) // initial estimate of the population mean
-        val estimFixed: EstimatorFn = { x -> this.fixed_alternative_mean(x, eta) }
-        val estimOptimal: EstimatorFn = { x -> this.optimal_comparison() } // TODO pass error_2_rate here ?
-        estimFn = if (estimFnType == EstimFnType.OPTIMAL) estimOptimal else estimFixed
+        val estimFixed: EstimatorLambda = { x -> this.fixed_alternative_mean(x, eta) }
+        val estimOptimal: EstimatorLambda = { x -> this.optimal_comparison() } // TODO pass error_2_rate here ?
+        val estimTrunc: EstimatorLambda = { x -> estimFnOverride!!.eta(x) }
+        estimFn = when (estimFnType) {
+            EstimFnType.OPTIMAL -> estimOptimal
+            EstimFnType.SHRINK_TRUNC -> estimTrunc
+            else -> estimFixed
+        }
     }
 
     // x are the samples of the population
@@ -391,17 +405,17 @@ class AlphaMart(val N: Int, val withReplacement: Boolean, val t: Double, val u: 
         // val atol = kwargs.get("atol", 2 * np.finfo(float).eps)
         // val rtol = kwargs.get("rtol", 10e-6)
 
-        println("x = ${x.contentToString()}")
+        println("   x = ${x.contentToString()}")
 
         // TODO This is eq 4 of ALPHA, p.5 :
         //      T_j = T_j-1 * (X_j * eta_j / mu_j + (u - X_j) * (u - eta_j) / ( u - mu_j)) / u
         //    where mu = m, T0 = 1.
         //
-        val etaj = this.estimFn(x) // estimFixed returns single "fixed" value; estimOptimal an array of size x
-        println("etaj = ${etaj.contentToString()}")
+        val etaj = this.estimFn(x)
+        println("   etaj = ${etaj.contentToString()}")
 
         val (_, Stot, _, m) = this.sjm(N, t, x)
-        println("m = ${m.contentToString()}")
+        println("   m = ${m.contentToString()}")
 
         //         with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
         //            etaj = self.estim(x)
@@ -418,8 +432,8 @@ class AlphaMart(val N: Int, val withReplacement: Boolean, val t: Double, val u: 
             else throw RuntimeException("NonnegMean alpha_mart")
         // these are the "terms" = T_j = T_j-1 * (tj)
         val terms = numpy_cumprod(tj)
-        println("tj = ${tj.contentToString()}")
-        println("T = ${terms.contentToString()}")
+        println("   tj = ${tj.contentToString()}")
+        println("   T = ${terms.contentToString()}")
 
         // terms[m > u] = 0  # true mean is certainly less than hypothesized
         repeat(terms.size) { if (m[it] > u) terms[it] = 0.0 } // true mean is certainly less than hypothesized
@@ -448,6 +462,8 @@ class AlphaMart(val N: Int, val withReplacement: Boolean, val t: Double, val u: 
         // return min(1, 1 / np.max(terms)), np.minimum(1, 1 / terms)
         val npmin = terms.map { min(1.0, 1.0 / it) }.toDoubleArray()
         val p = min(1.0, 1.0 / terms.max()) // seems wrong
+        println("   phistory = ${npmin.contentToString()}")
+
         return Pair(p, npmin)
     }
 
@@ -590,7 +606,7 @@ class AlphaMart(val N: Int, val withReplacement: Boolean, val t: Double, val u: 
     }
 
     // section 2.5.2 of ALPHA, p 9.
-fun shrink_trunc(x: DoubleArray, minsd : Double, d: Int, eta: Double, f: Double, c: Double, eps: Double): DoubleArray {
+    fun shrink_trunc(x: DoubleArray, minsd : Double, d: Int, eta: Double, f: Double, c: Double, eps: Double): DoubleArray {
         /*
     apply shrinkage/truncation estimator to an array to construct a sequence of "alternative" values
 
@@ -685,10 +701,10 @@ fun shrink_trunc(x: DoubleArray, minsd : Double, d: Int, eta: Double, f: Double,
         val sdj2 = sdj.mapIndexed { idx, it -> sqrt(it / j[idx]) } // j is the count
         // end of Welford's algorithm.
 
-        println("x = ${x.contentToString()}")
-        println("j = ${j.contentToString()}")
-        println("running mean = ${mj}")
-        println("running std = ${sdj2}")
+        //println("x = ${x.contentToString()}")
+        //println("j = ${j.contentToString()}")
+        //println("running mean = ${mj}")
+        //println("running std = ${sdj2}")
 
         // threshold the sd, set first two sds to 1
         // sdj = np.insert(np.maximum(sdj, minsd), 0, 1)[0:-1]
@@ -709,4 +725,66 @@ fun shrink_trunc(x: DoubleArray, minsd : Double, d: Int, eta: Double, f: Double,
         return npmax.map { min(u * (1 - eps), it) }.toDoubleArray()
     }
 
+}
+
+class ShrinkTrunc(val N: Int, // If N is np.inf, it means the sampling is with replacement
+                  val withReplacement: Boolean = false,
+                  val t: Double = 0.5,        // the hypothesized mean "under the null".
+                  val u: Double = 1.0,
+                  val minsd : Double,
+                  val d: Int,
+                  val eta: Double,
+                  val f: Double,
+                  val c: Double,
+                  val eps: Double) : EstimatorFn {
+
+    // section 2.5.2 of ALPHA, p 9.
+    override fun eta(x: DoubleArray ): DoubleArray {
+        val (S, _Stot, j, m) = this.sjm(N, t, x)
+        // Welford's algorithm for running mean and running sd
+        val mj = mutableListOf<Double>()
+        mj.add(x[0])
+        var sdj = mutableListOf<Double>()
+        sdj.add(0.0)
+
+        //        for i, xj in enumerate(x[1:]):
+        //            mj.append(mj[-1] + (xj - mj[-1]) / (i + 1))
+        //            sdj.append(sdj[-1] + (xj - mj[-2]) * (xj - mj[-1]))
+        // enumerate returns Pair(index, element)
+        for (idx in 0 until x.size-1) {
+            val xj = x[idx+1]
+            // mj.append(mj[-1] + (xj - mj[-1]) / (i + 1))
+            mj.add(mj.last() + (xj - mj.last()) / (idx + 2)) // fixed in PR # 89
+            // sdj.append(sdj[-1] + (xj - mj[-2]) * (xj - mj[-1]))
+            sdj.add(sdj.last() + (xj - mj[mj.size - 2]) * (xj - mj.last()))
+        }
+        // sdj = np.sqrt(sdj / j)
+        val sdj2 = sdj.mapIndexed { idx, it -> sqrt(it / j[idx]) } // j is the count
+        val sdj3 = DoubleArray(sdj2.size) { if (it < 2) 1.0 else max(sdj2[it-1], minsd) }
+        val weighted = sdj3.mapIndexed { idx, it -> ((d * eta + S[idx]) / (d + j[idx] - 1) + u * f / it) / (1 + f / it) }
+        val npmax = weighted.mapIndexed { idx, it ->  max( it, m[idx] + c / sqrt((d + j[idx] - 1).toDouble())) }
+        val etaj = npmax.map { min(u * (1 - eps), it) }
+        return etaj.toDoubleArray()
+    }
+
+    fun sjm(N: Int, t: Double, x: DoubleArray): CumulativeSum {
+        val cum_sum = numpy_cumsum(x)
+        val S = DoubleArray(x.size + 1) { if (it == 0) 0.0 else cum_sum[it - 1] }   // 0, x_1, x_1+x_2, ...,
+        val Stot = S.last()  // sample total ""array[-1] means the last element"
+        val Sp = DoubleArray(x.size) { S[it] } // same length as the data.
+
+//        j = np.arange(1, len(x) + 1)  # 1, 2, 3, ..., len(x)
+//        assert j[-1] <= N, "Sample size is larger than the population!"
+        val j = IntArray(x.size) { it + 1 } // 1, 2, 3, ..., len(x)
+        require(!withReplacement || x.size <= N) { "Sample size is larger than the population!" }
+//        m = ( (N * t - S) / (N - j + 1) if np.isfinite(N) else t )  # mean of population after (j-1)st draw, if null is true (t=eta is the mean)
+        // val m = if (withReplacement) doubleArrayOf(t) else DoubleArray(x.size) { (N * t - Sp[it]) / (N - j[it] + 1)  }
+        val m = DoubleArray(x.size) {
+            val m1 = (N * t - Sp[it])
+            val m2 = (N - j[it] + 1)
+            val m3 = m1 / m2
+            if (withReplacement) t else (N * t - Sp[it]) / (N - j[it] + 1)
+        }
+        return CumulativeSum(Sp, Stot, j, m)
+    }
 }

@@ -1,6 +1,5 @@
 package org.cryptobiotic.rla
 
-import org.cryptobiotic.rla.AlphaAlgorithm.CumulativeSum
 import org.cryptobiotic.shangrla.core.numpy_cumsum
 import org.cryptobiotic.shangrla.core.numpy_isclose
 import kotlin.math.max
@@ -120,7 +119,7 @@ class AlphaAlgorithm(
             }
             tjs.add(tj)
             testStatistic *= tj
-            println(" $sampleNumber = $xj etaj = $etaj tj=$tj, T = $testStatistic")
+            println("   $sampleNumber = $xj etaj = $etaj tj=$tj, T = $testStatistic")
             tstat.add(testStatistic)
 
             /* update the population mean
@@ -135,9 +134,9 @@ class AlphaAlgorithm(
 
             // – If desired, break and conduct a full hand count instead of continuing to audit.
         }
-        println(" etajs ${etajsa}")
-        println(" populationMeanValues ${sampleMeanValues}")
-        println(" tjs ${tjs}")
+        println("   etajs ${etajsa}")
+        println("   populationMeanValues ${sampleMeanValues}")
+        println("   tjs ${tjs}")
 
         //// exceptional conditions
         // terms[m > u] = 0  # true mean is certainly less than hypothesized
@@ -155,12 +154,12 @@ class AlphaAlgorithm(
         // terms[-1] = ( np.inf if Stot > N * t else terms[-1] )  # final sample makes the total greater than the null
         if (sampleSum > N * t) tstat[tstat.size - 1] = Double.POSITIVE_INFINITY // final sample makes the total greater than the null
 
-        println(" tstat ${tstat}")
+        println("   tstat ${tstat}")
 
         // return min(1, 1 / np.max(terms)), np.minimum(1, 1 / terms)
         val phistory = tstat.map { min(1.0, 1.0 / it) }
         // val p = min(1.0, 1.0 / tstat.max()) // seems wrong
-        println(" phistory ${phistory}")
+        println("   phistory ${phistory}")
 
         //
         //• If a full hand count is conducted, its results replace the reported results if they differ.
@@ -173,28 +172,10 @@ class AlphaAlgorithm(
     fun populationMean(sampleNum: Int, sampleSumM1: Double): Double {
         return if (withoutReplacement) (N * t - sampleSumM1) / (N - sampleNum + 1) else t
     }
-
-    fun truncShrinkage(c: Double, d: Double, eta0: Double, sumkm1: Double, sampleNum: Int) : Double {
-        // – Define the function to update eta based on the sample,
-        //	  e.g, eta(i, X^i−1 ) = ((d * η0 + S)/(d + i − 1) ∨ (eps(i) + µi )) ∧ u,    (2.5.2, eq 14, "truncated shrinkage")
-        //	    where S = Sum(Xk) k=1..i-1  is the sample sum of the first i-1 draws
-        //	    and eps(i) = c / sqrt(d + i − 1)
-
-        // 2.5.2 Choosing ǫi . To allow the estimated winner’s share ηi to approach
-        //√ µi as the sample grows
-        //(if the sample mean approaches µi or less), we shall take ǫi := c/ d + i − 1 for a nonnega-
-        //tive constant c, for instance c = (η0 − µ)/2. The estimate ηi is thus the sample mean, shrunk
-
-        var result = ((d * eta0 + sumkm1) / (d + sampleNum - 1)) //  ∨ (eps(i) + µi )) ∧ u
-
-        // The only requirement is that eta(i, X^i−1 ) ∈ (µi .. u), where µi := E(Xi |X i−1 ) is computed under the null.
-        // result = min( max(epsi + populationMean, result), upperBound)
-        return result
-    }
-
-    data class CumulativeSum(val S: DoubleArray, val Stot: Double, val indices: IntArray, val mean: DoubleArray)
-
 }
+
+data class CumulativeSum(val S: DoubleArray, val Stot: Double, val indices: IntArray, val mean: DoubleArray)
+
 
 // Compute the alternative mean just before the jth draw, for a fixed alternative that the original population mean is eta.
 class FixedAlternativeMean(val N: Int, val eta0:Double): EstimFn {
@@ -211,21 +192,25 @@ class TruncShrinkage(val N: Int, val u: Double, val t: Double, val minsd : Doubl
     val welford = Welford()
 
     override fun eta(prevSamples: List<Double>): Double {
+        if (prevSamples.size == 0) return eta0
         welford.update(prevSamples.last())
-        if (prevSamples.size == 1) return eta0
-
-        val (_, _, std) = welford.result()
-        val sdj3 = max(std, minsd)
+        // if (prevSamples.size == 1) return eta0
 
         val lastj = prevSamples.size
-        val sampleSum = prevSamples.sum()
+        val sampleSum = prevSamples.subList(0, lastj - 1).sum()
+
+        val (_, _, std) = welford.result()
+        val sdj3 = if (lastj < 2) 1.0 else max(std, minsd)
 
         val mean = mean(N, t, prevSamples)
         val mean2 = mean2(N, t, prevSamples)
         require(mean == mean2)
 
-        val weighted = ((d * eta0 + sampleSum) / (d + lastj - 1) + u * f / sdj3) / (1 + f / sdj3) // eq 14
-        val npmax = max( weighted, mean2 + c / sqrt((d + lastj - 1).toDouble()))
+        val weighted = ((d * eta0 + sampleSum) / (d + lastj - 1) + u * f / sdj3) / (1 + f / sdj3) // (2.5.2, eq 14, "truncated shrinkage")
+        // Choosing ǫi . To allow the estimated winner’s share ηi to approach √ µi as the sample grows
+        // (if the sample mean approaches µi or less), we shall take ǫi := c/ d + i − 1 for a nonnegative constant c, for instance c = (η0 − µ)/2.
+        // The estimate ηi is thus the sample mean, shrunk towards η0 and truncated to the interval [µi + ǫi , 1), where ǫi → 0 as the sample size grows.
+        val npmax = max( weighted, mean2 + c / sqrt((d + lastj - 1).toDouble()))  // 2.5.2 "choosing ǫi"
         val gold = min(u * (1 - eps), npmax)
         return gold
     }
@@ -242,6 +227,7 @@ class TruncShrinkage(val N: Int, val u: Double, val t: Double, val minsd : Doubl
             val m3 = m1 / m2
             m3
         }
+        println("   j = ${j.last()} m = ${m.last()}")
         return m.last()
     }
 
@@ -259,10 +245,8 @@ class TruncShrinkage(val N: Int, val u: Double, val t: Double, val minsd : Doubl
         val mj = mutableListOf<Double>()
         var sdj = mutableListOf<Double>()
 
-        //if (prevSamples.size == 1) {
-            mj.add(prevSamples[0])
-            sdj.add(0.0)
-        //}
+        mj.add(prevSamples[0])
+        sdj.add(0.0)
 
         // Welford's algorithm for running mean and running sd
         val (S, _, j, m) = this.sjm(N, t, prevSamples)
