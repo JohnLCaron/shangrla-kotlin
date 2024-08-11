@@ -427,7 +427,14 @@ class AlphaMart(val N: Int, val withReplacement: Boolean, val t: Double, val u: 
 
         // meed both m and eta
         val tj =
-            if (etaj.size == x.size) DoubleArray(x.size) { (x[it] * etaj[it] / m[it] + (u - x[it]) * (u - etaj[it]) / (u - m[it])) / u }
+            if (etaj.size == x.size) { DoubleArray(x.size) {
+                    val tmp1 = x[it] * etaj[it] / m[it]
+                    val tmp2 = (u - x[it]) * (u - etaj[it])
+                    val tmp3 =   (u - m[it])
+                    val tmp4 = (tmp1 + tmp2 / tmp3) / u
+                    (x[it] * etaj[it] / m[it] + (u - x[it]) * (u - etaj[it]) / (u - m[it])) / u
+                }
+            }
             else if (etaj.size == 1) DoubleArray(x.size) { (x[it] * etaj[0] / m[it] + (u - x[it]) * (u - etaj[0]) / (u - m[it])) / u }
             else throw RuntimeException("NonnegMean alpha_mart")
         // these are the "terms" = T_j = T_j-1 * (tj)
@@ -608,44 +615,44 @@ class AlphaMart(val N: Int, val withReplacement: Boolean, val t: Double, val u: 
     // section 2.5.2 of ALPHA, p 9.
     fun shrink_trunc(x: DoubleArray, minsd : Double, d: Int, eta: Double, f: Double, c: Double, eps: Double): DoubleArray {
         /*
-    apply shrinkage/truncation estimator to an array to construct a sequence of "alternative" values
+        apply shrinkage/truncation estimator to an array to construct a sequence of "alternative" values
 
-    sample mean is shrunk towards eta, with relative weight d compared to a single observation,
-    then that combination is shrunk towards u, with relative weight f/(stdev(x)).
+        sample mean is shrunk towards eta, with relative weight d compared to a single observation,
+        then that combination is shrunk towards u, with relative weight f/(stdev(x)).
 
-    The result is truncated above at u*(1-eps) and below at m_j+e_j(c,j)
+        The result is truncated above at u*(1-eps) and below at m_j+e_j(c,j)
 
-    Shrinking towards eta stabilizes the sample mean as an estimate of the population mean.
-    Shrinking towards u takes advantage of low-variance samples to grow the test statistic more rapidly.
+        Shrinking towards eta stabilizes the sample mean as an estimate of the population mean.
+        Shrinking towards u takes advantage of low-variance samples to grow the test statistic more rapidly.
 
-    The running standard deviation is calculated using Welford's method.
+        The running standard deviation is calculated using Welford's method.
 
-    S_1 := 0
-    S_j := \sum_{i=1}^{j-1} x_i, j >= 1
-    m_j := (N*t-S_j)/(N-j+1) if np.isfinite(N) else t
-    e_j := c/sqrt(d+j-1)
-    sd_1 := sd_2 = 1
-    sd_j := sqrt[(\sum_{i=1}^{j-1} (x_i-S_j/(j-1))^2)/(j-2)] \wedge minsd, j>2
-    eta_j :=  ( [(d*eta + S_j)/(d+j-1) + f*u/sd_j]/(1+f/sd_j) \vee (m_j+e_j) ) \wedge u*(1-eps)
+        S_1 := 0
+        S_j := \sum_{i=1}^{j-1} x_i, j >= 1
+        m_j := (N*t-S_j)/(N-j+1) if np.isfinite(N) else t
+        e_j := c/sqrt(d+j-1)
+        sd_1 := sd_2 = 1
+        sd_j := sqrt[(\sum_{i=1}^{j-1} (x_i-S_j/(j-1))^2)/(j-2)] \wedge minsd, j>2
+        eta_j :=  ( [(d*eta + S_j)/(d+j-1) + f*u/sd_j]/(1+f/sd_j) \vee (m_j+e_j) ) \wedge u*(1-eps)
 
-    Parameters
-    ----------
-    x: np.array
-        input data
-    attributes used:
-        eta: float in (t, u) (default u*(1-eps))
-            initial alternative hypothethesized value for the population mean
-        c: positive float
-            scale factor for allowing the estimated mean to approach t from above
-        d: positive float
-            relative weight of eta compared to an observation, in updating the alternative for each term
-        f: positive float
-            relative weight of the upper bound u (normalized by the sample standard deviation)
-        minsd: positive float
-            lower threshold for the standard deviation of the sample, to avoid divide-by-zero errors and
-            to limit the weight of u
+        Parameters
+        ----------
+        x: np.array
+            input data
+        attributes used:
+            eta: float in (t, u) (default u*(1-eps))
+                initial alternative hypothethesized value for the population mean
+            c: positive float
+                scale factor for allowing the estimated mean to approach t from above
+            d: positive float
+                relative weight of eta compared to an observation, in updating the alternative for each term
+            f: positive float
+                relative weight of the upper bound u (normalized by the sample standard deviation)
+            minsd: positive float
+                lower threshold for the standard deviation of the sample, to avoid divide-by-zero errors and
+                to limit the weight of u
 
-    */
+        */
         //         u = self.u
         //        N = self.N
         //        t = self.t
@@ -766,8 +773,9 @@ class ShrinkTrunc(val N: Int, // If N is np.inf, it means the sampling is with r
         val etaj = npmax.map { min(u * (1 - eps), it) }
         return etaj.toDoubleArray()
     }
-
-    fun sjm(N: Int, t: Double, x: DoubleArray): CumulativeSum {
+//         This method calculates the cumulative sum of the input array `x`, the total sum of `x`,
+//        an array of indices, and the mean of the population after each draw if the null hypothesis is true.
+     fun sjm(N: Int, t: Double, x: DoubleArray): CumulativeSum {
         val cum_sum = numpy_cumsum(x)
         val S = DoubleArray(x.size + 1) { if (it == 0) 0.0 else cum_sum[it - 1] }   // 0, x_1, x_1+x_2, ...,
         val Stot = S.last()  // sample total ""array[-1] means the last element"

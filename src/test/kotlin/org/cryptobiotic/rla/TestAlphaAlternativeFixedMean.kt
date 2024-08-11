@@ -17,18 +17,18 @@ fun setEta0(t: Double = 0.5, upperBound: Double = 1.0) : Double {
     return (t + (upperBound - t) / 2)
 }
 
-// Compare AlphaAlgorithm with output from start/TestNonnegMean
+// Compare AlphaAlgorithm with output from start/TestNonnegMean.testAlphaMartAllHalf
 class TestAlphaAlternativeFixedMean  {
 
     @Test
-    fun testAlphaMartAllHalf2() {
+    fun testAlphaAllHalf() {
         //        # When all the items are 1/2, estimated p for a mean of 1/2 should be 1.
         //        s = np.ones(5)/2
         //        test = NonnegMean(N=int(10**6))
         //        np.testing.assert_almost_equal(test.alpha_mart(s)[0],1.0)
         val s1 = DoubleArray(5) { .5 }
         val u = 1.0
-        val N = 100
+        val N = 1_000_000
 
         val estimFn = FixedAlternativeMean(N, setEta0())
         val alpha = AlphaAlgorithm(estimFn=estimFn, N=N, upperBound=u)
@@ -36,8 +36,7 @@ class TestAlphaAlternativeFixedMean  {
         val algoValues = alpha.run(s1.size) { sampler.sample() }
 
         // run 0.75, 0.75000025000025, 0.750000500001, 0.75000075000225, 0.750001000004
-        // run2 0.75, 0.7525252525252525, 0.7551020408163265, 0.7577319587628866, 0.7604166666666666
-        doublesAreClose(listOf(0.75, 0.7525252525252525, 0.7551020408163265, 0.7577319587628866, 0.7604166666666666), algoValues.etaj)
+        doublesAreClose(listOf(0.75, 0.75000025000025, 0.750000500001, 0.75000075000225, 0.750001000004), algoValues.etaj)
         algoValues.phistory.forEach { assertEquals(1.0, it)}
     }
 

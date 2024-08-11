@@ -170,7 +170,7 @@ class TestNonnegMean {
 
                 // fun shrink_trunc(x: DoubleArray, minsd : Double, d: Int, eta: Double, f: Double, c: Double, eps: Double): DoubleArray {
                 val xfin = alphamart.shrink_trunc(x.toDoubleArray(), minsd=minsd, d = d, eta=eta, f=f, c=c, eps=eps)
-                val yfin = DoubleArray(N)
+                val expect = DoubleArray(N)
 //                 for j in range(1,N+1):
 //                    est = (d*eta + Sj(x,j))/(d+j-1)
 //                    most = u*(1-np.finfo(float).eps)
@@ -184,11 +184,12 @@ class TestNonnegMean {
                     val most = u * (1 - eps)
                     val tjv = tj(N, t, x, j)
                     val epsjv = epsj(c, d, j)
-                    yfin[it] = min( max(tj(N, t, x, j) + epsj(c, d, j), est), most)
+                    expect[it] = min( max(tj(N, t, x, j) + epsj(c, d, j), est), most)
                 }
+                println("eta = ${eta}, v = ${x}")
                 println("xfin = ${xfin.contentToString()}")
-                println("yfin = ${yfin.contentToString()}")
-                doublesAreClose(xfin, yfin)
+                println("expect = ${expect.contentToString()}")
+                doublesAreClose(xfin, expect)
                 println()
             }
         }

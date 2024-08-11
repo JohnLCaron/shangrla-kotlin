@@ -6,7 +6,7 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
 
-//         return AlgoValues(etajsa, populationMeanValues, tjs, tjs
+//  return AlgoValues(etajsa, populationMeanValues, tjs, tjs
 data class AlgoValues(val etaj: List<Double>, val populationMeanValues: List<Double>, val tjs: List<Double>,
                       val tstat: List<Double>, val phistory: List<Double>)
 
@@ -17,7 +17,8 @@ interface EstimFn {
     fun eta(prevSamples: List<Double>): Double
 }
 
-// ALPHA paper, section 3, p.9
+// ALPHA paper, "ALPHA: AUDIT THAT LEARNS FROM PREVIOUSLY HAND-AUDITED BALLOTS" 12 Aug 2022
+// section 3, p.9
 class AlphaAlgorithm(
     val estimFn : EstimFn,
     val N: Int, // number of ballot cards in the population of cards from which the sample is drawn
@@ -28,10 +29,9 @@ class AlphaAlgorithm(
     val t: Double = 0.5,        // the hypothesized mean "under the null". TODO is it ever not 1/2 ?
     val isPolling: Boolean = false,
 ) {
-    //var eta0 = setEta0()
-    //val c = (eta0 - upperBound / 2)
 
     init {
+        // Pseudo-algorithm for ballot-level comparison and ballot-polling audits
         //• Set audit parameters:
         // – Select the risk limit α ∈ (0, 1)
         // - decide whether to sample with or without replacement.
@@ -56,15 +56,11 @@ class AlphaAlgorithm(
     fun run(maxSample: Int, drawSample : () -> Double) : AlgoValues {
 
         // Initialize variables
-        // – j ← 0: sample number
-        // – T ← 1: test statistic
-        // – S ← 0: sample sum
-        // – m = µ_j = 1/2: population mean under the null
-
-        var sampleNumber = 0
-        var testStatistic = 1.0
-        var sampleSum = 0.0
-        var populationMean = .5
+        var sampleNumber = 0        // – j ← 0: sample number
+        var testStatistic = 1.0     // – T ← 1: test statistic
+        var sampleSum = 0.0        // – S ← 0: sample sum
+        // var prevSampleSum = 0.0
+        var populationMeanUnderNull = t // – m = µ_j = 1/2: population mean under the null
 
         // Let
         //  theta = 1/N * Sum(xj)
@@ -79,8 +75,11 @@ class AlphaAlgorithm(
         val etajsa = mutableListOf<Double>()
         val tjs = mutableListOf<Double>()
         val tstat = mutableListOf<Double>()
+        val Sp = mutableListOf<Double>()
+        Sp.add(sampleSum)
 
-        //
+        // sampleAssortValues.add(drawSample()) // LOOK only works for trunc?
+
         // While T < 1/α and not all ballot cards have been audited:
         // while (testStatistic < 1/risk_limit && sampleNumber < maxSample) {
         while (sampleNumber < maxSample) {
@@ -88,49 +87,50 @@ class AlphaAlgorithm(
             // – Draw a ballot at random
             // – Determine Xj by applying the assorter to the selected ballot card (and the CVR, for comparison audits)
             val xj: Double = drawSample()
-            // val sampleMean = sampleAssortValues.average()
-            sampleNumber++
+            sampleNumber++ // j <- j + 1
 
-            //// use previous sample sum
-            populationMean = this.populationMean(sampleNumber, sampleSum)
-            sampleMeanValues.add(populationMean)
-
-            //// use previous sample list
+            // η(j,S) seems to imply depends only on sample sum ??
+            // note using sample list not including current sample
             val etaj = estimFn.eta(sampleAssortValues)
             etajsa.add(etaj)
-
             sampleAssortValues.add(xj)
-            sampleSum += xj // – S ← S + Xj
 
-            // T is the "ALPHA supermartingale"
             // – If m < 0, T ← ∞. Otherwise, T ← T / u * ( Xj * η(j,S)/m + (u - Xj) * (u−η(j,S))/(u-m))
-            // TODO This is eq 4 of ALPHA, p.5 :
-            //      T_j = T_j-1 * (X_j * eta_j / µ_j + (u - X_j) * (u - eta_j) / ( u - µ_j)) / u
-            // python:  terms = np.cumprod((x * etaj / m + (u - x) * (u - etaj) / (u - m)) / u)
-            // python: m = µ_j = The mean of the population after each draw if the null hypothesis is true.
-            //          m = ( (N * t - S) / (N - j + 1) if np.isfinite(N) else t )  # mean of population after (j-1)st draw, if null is true
-            // X_j = jthe sample
-            // eta_j = estimate of population mean = eta(X^j-a)
+            // T is the "ALPHA supermartingale"
             // u = upperBound
+            // Xj = jth sample
+            // η(j,S) = eta_j = estimate of population mean = eta(X^j-a)
             // µ_j = m = The mean of the population after each draw if the null hypothesis is true.
+            // This is eq 4 of ALPHA, p.5 :
+            //      T_j = T_j-1 * (X_j * eta_j / µ_j + (u - X_j) * (u - eta_j) / ( u - µ_j)) / u
 
-            val tj = if (populationMean < 0.0) Double.POSITIVE_INFINITY else {
-                (xj * etaj / populationMean + (upperBound - xj) * (upperBound - etaj) / (upperBound - populationMean))/ upperBound
+            // LOOK moved from below, only changes when sampling without replacement.
+            populationMeanUnderNull = this.populationMean(sampleNumber, sampleSum)
+            sampleMeanValues.add(populationMeanUnderNull)
+
+            // – If m < 0, tj ← ∞. Otherwise, tj ← ( Xj * η(j,S)/m + (u - Xj) * (u−η(j,S))/(u-m)) / u
+            val tj = if (populationMeanUnderNull < 0.0) Double.POSITIVE_INFINITY else {
+                val tmp1 = xj * etaj / populationMeanUnderNull
+                val tmp2 = (upperBound - xj) * (upperBound - etaj)
+                val tmp3 =  (upperBound - populationMeanUnderNull)
+                val tmp4 = (tmp1 + tmp2 / tmp3) / upperBound
+                (xj * etaj / populationMeanUnderNull + (upperBound - xj) * (upperBound - etaj) / (upperBound - populationMeanUnderNull)) / upperBound
             }
             tjs.add(tj)
-            testStatistic *= tj
-            println("   $sampleNumber = $xj etaj = $etaj tj=$tj, T = $testStatistic")
+            testStatistic *= tj // Tj ← Tj-1 & tj
             tstat.add(testStatistic)
+            println("    $sampleNumber = $xj etaj = $etaj tj=$tj, T = $testStatistic")
 
-            /* update the population mean
+            // – S ← S + Xj
+            val sampleSumM1 = sampleSum
+            sampleSum += xj
+            Sp.add(sampleSum)
+
             // – If the sample is drawn without replacement, m ← (N/2 − S)/(N − j + 1)
             //   m = ( (N * t - S) / (N - j + 1) if np.isfinite(N) else t )  # mean of population after (j-1)st
-            if (withoutReplacement) {
-                populationMean = (.5*N - sampleSum)/(N - sampleNumber + 1)
-                if (populationMean < 0.0)
-                    println("wtf")
-            }
-             */
+            // TODO for some reason we want the previous sampleSum for the population mean
+            //populationMeanUnderNull = this.populationMean(sampleNumber, sampleSumM1)
+            //sampleMeanValues.add(populationMeanUnderNull)
 
             // – If desired, break and conduct a full hand count instead of continuing to audit.
         }
@@ -170,6 +170,10 @@ class AlphaAlgorithm(
     // TODO seems to be the "mean of the remaining sample", which is why it depends on whether you are replacing or not
     // TODO detect if it goes negetive
     fun populationMean(sampleNum: Int, sampleSumM1: Double): Double {
+        // LOOK should be the estim function with
+        val m1 = (N * t - sampleSumM1)
+        val m2 = (N - sampleNum + 1)
+        val m3 = m1 / m2
         return if (withoutReplacement) (N * t - sampleSumM1) / (N - sampleNum + 1) else t
     }
 }
@@ -180,39 +184,69 @@ data class CumulativeSum(val S: DoubleArray, val Stot: Double, val indices: IntA
 // Compute the alternative mean just before the jth draw, for a fixed alternative that the original population mean is eta.
 class FixedAlternativeMean(val N: Int, val eta0:Double): EstimFn {
 
+    //         val m = DoubleArray(x.size) {
+    //            val m1 = (N * t - Sp[it])
+    //            val m2 = (N - j[it] + 1)
+    //            val m3 = m1 / m2
+    //            if (isFinite) (N * t - Sp[it]) / (N - j[it] + 1) else t
+    //        }
+
     override fun eta(prevSamples: List<Double>): Double {
         val j = prevSamples.size + 1
         val sampleSum = prevSamples.sum()
-        return (N * eta0 - sampleSum) / (N - j + 1)
+        val m1 = (N * eta0 - sampleSum)
+        val m2 = (N - j + 1)
+        val m3 = m1 / m2
+        val result = (N * eta0 - sampleSum) / (N - j + 1)
+        return result
     }
 
 }
 
-class TruncShrinkage(val N: Int, val u: Double, val t: Double, val minsd : Double, val d: Int, val eta0: Double, val f: Double, val c: Double, val eps: Double): EstimFn {
+class TruncShrinkage(val N: Int, val u: Double, val t: Double, val minsd : Double, val d: Int, val eta0: Double,
+                     val f: Double, val c: Double, val eps: Double): EstimFn {
     val welford = Welford()
 
-    override fun eta(prevSamples: List<Double>): Double {
-        if (prevSamples.size == 0) return eta0
-        welford.update(prevSamples.last())
-        // if (prevSamples.size == 1) return eta0
-
+    fun etaFromPaper(prevSamples: List<Double>): Double { // maybe
         val lastj = prevSamples.size
-        val sampleSum = prevSamples.subList(0, lastj - 1).sum()
+        val sampleSum = prevSamples.subList(0, lastj).sum()
 
-        val (_, _, std) = welford.result()
-        val sdj3 = if (lastj < 2) 1.0 else max(std, minsd)
+        val weighted = (d * eta0 + sampleSum) / (d + lastj - 1) // (2.5.2, eq 14, "truncated shrinkage")
+        val mean2 = mean2(N, t, prevSamples) // ??
+        val epsi = c / sqrt((d + lastj - 1).toDouble())  // 2.5.2 "choosing ǫi", d could be double
+        val npmax = max( weighted, mean2 + epsi)  // 2.5.2 "choosing ǫi"
 
-        val mean = mean(N, t, prevSamples)
+        return min(npmax, u)
+    }
+
+    override fun eta(prevSamples: List<Double>): Double {
+        //if (prevSamples.size == 0) {
+        //    return eta0
+        // }
+        val lastj = prevSamples.size
+
+        val sampleSum = if (prevSamples.size == 0) 0.0 else {
+            welford.update(prevSamples.last())
+            prevSamples.subList(0, lastj - 1).sum() // LOOK only taking n-1
+        }
+
+        val (_, variance, _) = welford.result()
+        val stdev = Math.sqrt(variance)
+        val sdj3 = if (lastj < 2) 1.0 else max(stdev, minsd)
+
+       // val mean = mean(N, t, prevSamples)
         val mean2 = mean2(N, t, prevSamples)
-        require(mean == mean2)
+       // require(mean == mean2)
 
         val weighted = ((d * eta0 + sampleSum) / (d + lastj - 1) + u * f / sdj3) / (1 + f / sdj3) // (2.5.2, eq 14, "truncated shrinkage")
         // Choosing ǫi . To allow the estimated winner’s share ηi to approach √ µi as the sample grows
         // (if the sample mean approaches µi or less), we shall take ǫi := c/ d + i − 1 for a nonnegative constant c, for instance c = (η0 − µ)/2.
         // The estimate ηi is thus the sample mean, shrunk towards η0 and truncated to the interval [µi + ǫi , 1), where ǫi → 0 as the sample size grows.
         val npmax = max( weighted, mean2 + c / sqrt((d + lastj - 1).toDouble()))  // 2.5.2 "choosing ǫi"
-        val gold = min(u * (1 - eps), npmax)
-        return gold
+        val eta = min(u * (1 - eps), npmax)
+
+        println("   TruncShrinkage ${welford.count} prevSamples=${prevSamples} sampleSum= $sampleSum eta=$eta")
+        return eta
     }
 
     fun mean(N: Int, t: Double, x: List<Double>): Double {
@@ -232,6 +266,7 @@ class TruncShrinkage(val N: Int, val u: Double, val t: Double, val minsd : Doubl
     }
 
     fun mean2(N: Int, t: Double, x: List<Double>): Double {
+        if (x.size == 0) return .5
         val sum = x.subList(0, x.size-1).sum()
         val m1 = (N * t - sum)
         val m2 = (N - x.size + 1)
@@ -239,6 +274,7 @@ class TruncShrinkage(val N: Int, val u: Double, val t: Double, val minsd : Doubl
         return m3
     }
 
+    // original eta function from NonnegMean.shrink_trunc()
     fun etaOld(prevSamples: List<Double>): Double {
         // if (prevSamples.size == 0) return eta0
 
@@ -303,6 +339,14 @@ class TruncShrinkage(val N: Int, val u: Double, val t: Double, val minsd : Doubl
     }
 }
 
+//    m = [x[0]]
+//    v = [0]
+//    for i, xi in enumerate(x[1:]):
+//        m.append(m[-1] + (xi - m[-1]) / (i + 2))
+//        v.append(v[-1] + (xi - m[-2]) * (xi - m[-1]))
+//    v = v / np.arange(1, len(x) + 1)
+//    return np.array(m), v
+
 class Welford() {
     var count = 0
     var mean = 0.0 // mean accumulates the mean of the entire dataset
@@ -322,7 +366,6 @@ class Welford() {
         if (count < 2) return Triple(mean, Double.NaN, Double.NaN)
         val variance = M2 / count
         val sample_variance = M2 / (count - 1)
-        val std_dev = Math.sqrt(variance)
-        return Triple(mean, variance, std_dev)
+        return Triple(mean, variance, sample_variance)
     }
 }

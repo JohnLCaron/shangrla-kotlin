@@ -39,7 +39,7 @@ class TestWorkflow {
             contest.assertions.forEach { println("  ${it}") }
         }
 
-        ///* Set up for sampling
+        // Set up for sampling
         val sample_size = audit.find_sample_size(contests, cvrs=cvrs)
         println("sample_size = ${sample_size}")
 

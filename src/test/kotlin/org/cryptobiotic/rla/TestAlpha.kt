@@ -44,7 +44,7 @@ class TestAlpha {
     // oops python caught this at PR #89
     @Test
     fun testWelford() {
-        val sample = DoubleArray(10) { if (it % 2 == 0) 1.0 else 2.0 }
+        val sample = doubleArrayOf(1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0)
         w2(sample)
 
         println("mean = ${sample.average()}")
@@ -86,11 +86,11 @@ fun w2(x: DoubleArray) {
         sdj.add(sdj.last() + (xj - mj[mj.size - 2]) * (xj - mj.last()))
     }
     // sdj = np.sqrt(sdj / j)
-    val sdj2 = sdj.mapIndexed { idx, it -> sqrt(it / (idx + 1)) }
+    val sdj2 = sdj.mapIndexed { idx, it -> (it / (idx + 1)) }
     // end of Welford's algorithm.
 
-    println("running mean = ${mj}")
-    println("running variance = ${sdj2}")
+    println("w2 running mean = ${mj}")
+    println("w2 running variance = ${sdj2}")
 }
 
 /* Welford's algorithm for running mean and running sd
@@ -118,8 +118,8 @@ fun welford(x: DoubleArray): Pair<List<Double>, List<Double>> {
 
 fun DoubleArray.variance(): Double {
     val mean = this.average()
-    val variance = this.map { (it - mean).pow(2) }.average()
-    return Math.sqrt(variance)
+    val variance = this.map { (it - mean) * (it - mean) }.average()
+    return variance
 }
 
 
