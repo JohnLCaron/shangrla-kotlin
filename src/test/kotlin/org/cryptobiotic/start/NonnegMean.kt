@@ -37,6 +37,8 @@ enum class EstimFnType {
     SHRINK_TRUNC,
 }
 
+private val debugNonnegMean = false
+
 // Tests of the hypothesis that the mean of a population of values in [0, u] is less than or equal to t
 data class NonnegMean(
     val N: Int, // If N is np.inf, it means the sampling is with replacement
@@ -405,17 +407,17 @@ class AlphaMart(val N: Int, val withReplacement: Boolean, val t: Double, val u: 
         // val atol = kwargs.get("atol", 2 * np.finfo(float).eps)
         // val rtol = kwargs.get("rtol", 10e-6)
 
-        println("   x = ${x.contentToString()}")
+        if (debugNonnegMean) println("   x = ${x.contentToString()}")
 
         // TODO This is eq 4 of ALPHA, p.5 :
         //      T_j = T_j-1 * (X_j * eta_j / mu_j + (u - X_j) * (u - eta_j) / ( u - mu_j)) / u
         //    where mu = m, T0 = 1.
         //
         val etaj = this.estimFn(x)
-        println("   etaj = ${etaj.contentToString()}")
+        if (debugNonnegMean) println("   etaj = ${etaj.contentToString()}")
 
         val (_, Stot, _, m) = this.sjm(N, t, x)
-        println("   m = ${m.contentToString()}")
+        if (debugNonnegMean) println("   m = ${m.contentToString()}")
 
         //         with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
         //            etaj = self.estim(x)
@@ -439,8 +441,8 @@ class AlphaMart(val N: Int, val withReplacement: Boolean, val t: Double, val u: 
             else throw RuntimeException("NonnegMean alpha_mart")
         // these are the "terms" = T_j = T_j-1 * (tj)
         val terms = numpy_cumprod(tj)
-        println("   tj = ${tj.contentToString()}")
-        println("   T = ${terms.contentToString()}")
+        if (debugNonnegMean) println("   tj = ${tj.contentToString()}")
+        if (debugNonnegMean) println("   T = ${terms.contentToString()}")
 
         // terms[m > u] = 0  # true mean is certainly less than hypothesized
         repeat(terms.size) { if (m[it] > u) terms[it] = 0.0 } // true mean is certainly less than hypothesized
@@ -469,7 +471,7 @@ class AlphaMart(val N: Int, val withReplacement: Boolean, val t: Double, val u: 
         // return min(1, 1 / np.max(terms)), np.minimum(1, 1 / terms)
         val npmin = terms.map { min(1.0, 1.0 / it) }.toDoubleArray()
         val p = min(1.0, 1.0 / terms.max()) // seems wrong
-        println("   phistory = ${npmin.contentToString()}")
+        if (debugNonnegMean) println("   phistory = ${npmin.contentToString()}")
 
         return Pair(p, npmin)
     }

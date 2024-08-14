@@ -35,7 +35,7 @@ class AlphaAlgorithm(
         //• Set audit parameters:
         // – Select the risk limit α ∈ (0, 1)
         // - decide whether to sample with or without replacement.
-        // – Set u as appropriate for the assertion under audit.
+        // – Set upper as appropriate for the assertion under audit.
         // – Set N to the number of ballot cards in the population of cards from which the sample is drawn.
         // – Set η0
         //    For polling audits, η0 could be the reported mean value of the assorter.
@@ -170,7 +170,7 @@ class AlphaAlgorithm(
     // TODO seems to be the "mean of the remaining sample", which is why it depends on whether you are replacing or not
     // TODO detect if it goes negetive
     fun populationMean(sampleNum: Int, sampleSumM1: Double): Double {
-        // LOOK should be the estim function with
+        // LOOK should be the estim function ??
         val m1 = (N * t - sampleSumM1)
         val m2 = (N - sampleNum + 1)
         val m3 = m1 / m2
@@ -230,7 +230,7 @@ class TruncShrinkage(val N: Int, val u: Double, val t: Double, val minsd : Doubl
             prevSamples.subList(0, lastj - 1).sum() // LOOK only taking n-1
         }
 
-        val (_, variance, _) = welford.result()
+        val (_, variance, _) = welford.result() // all we want is the variance ??
         val stdev = Math.sqrt(variance)
         val sdj3 = if (lastj < 2) 1.0 else max(stdev, minsd)
 
@@ -238,9 +238,12 @@ class TruncShrinkage(val N: Int, val u: Double, val t: Double, val minsd : Doubl
         val mean2 = mean2(N, t, prevSamples)
        // require(mean == mean2)
 
-        val weighted = ((d * eta0 + sampleSum) / (d + lastj - 1) + u * f / sdj3) / (1 + f / sdj3) // (2.5.2, eq 14, "truncated shrinkage")
-        // Choosing ǫi . To allow the estimated winner’s share ηi to approach √ µi as the sample grows
-        // (if the sample mean approaches µi or less), we shall take ǫi := c/ d + i − 1 for a nonnegative constant c, for instance c = (η0 − µ)/2.
+        // (2.5.2, eq 14, "truncated shrinkage")
+        val weighted = ((d * eta0 + sampleSum) / (d + lastj - 1) + u * f / sdj3) / (1 + f / sdj3)
+
+        // Choosing epsi . To allow the estimated winner’s share ηi to approach √ µi as the sample grows
+        // (if the sample mean approaches µi or less), we shall take epsi := c/ sqrt(d + i − 1) for a nonnegative constant c,
+        // for instance c = (η0 − µ)/2.
         // The estimate ηi is thus the sample mean, shrunk towards η0 and truncated to the interval [µi + ǫi , 1), where ǫi → 0 as the sample size grows.
         val npmax = max( weighted, mean2 + c / sqrt((d + lastj - 1).toDouble()))  // 2.5.2 "choosing ǫi"
         val eta = min(u * (1 - eps), npmax)
@@ -321,6 +324,7 @@ class TruncShrinkage(val N: Int, val u: Double, val t: Double, val minsd : Doubl
         return npmax.map { min(u * (1 - eps), it) }.last()
     }
 
+    // for etaOld
     fun sjm(N: Int, t: Double, x: List<Double>): CumulativeSum {
         val cum_sum = numpy_cumsum(x.toDoubleArray())
         val S = DoubleArray(x.size+1) { if (it == 0) 0.0 else cum_sum[it-1] }   // 0, x_1, x_1+x_2, ...,
