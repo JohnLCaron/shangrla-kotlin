@@ -15,7 +15,7 @@ class Audit(
     val quantile: Double = 0.8,
     val error_rate_1: Double = 0.001, // rate of 1-vote overstatement errors
     val error_rate_2: Double = 0.0, // rate of 2-vote overstatement errors
-    val reps: Int = 100,
+    val reps: Int = 10,
     val auditType: AuditType = AuditType.CARD_COMPARISON,
     val use_styles: Boolean = true,
     ) {

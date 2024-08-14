@@ -1,6 +1,5 @@
 package org.cryptobiotic.shangrla.core
 
-import org.cryptobiotic.shangrla.core.*
 import java.lang.Math.log
 import kotlin.math.ceil
 import kotlin.test.*
@@ -661,7 +660,7 @@ class TestAssertion {
         val loser: List<String> = (AvB.candidates.toSet() - AvB.reported_winners.toSet()).toList()
         AvB.assertions = Assertion.make_plurality_assertions(AvB, winner = AvB.reported_winners, loser = loser).toMutableMap()
         AvB.find_margins_from_tally()
-        for ((a_id, a) in AvB.assertions) {
+        for ((_, a) in AvB.assertions) {
             println("\nAssertion winner = ${a.winner} loser = ${a.loser}")
 
             // first test

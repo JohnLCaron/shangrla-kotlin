@@ -501,41 +501,41 @@ data class Assertion(
             var i_small = 0
             var i_med = 0
             var i_big = 0
-            var r_small = if (n_small != 0) 1 else 0 // TODO
-            var r_med = if (n_med != 0) 1 else 0 // TODO
-            var r_big = 1
-            if (r_small != 0) {   //start with small TODO
+            var r_small = if (n_small != 0) 1.0 else 0.0
+            var r_med = if (n_med != 0) 1.0 else 0.0
+            var r_big = 1.0
+            if (r_small != 0.0) {   //start with small
                 x[0] = small
                 i_small = 1
-                r_small = (n_small - i_small) / n_small
-            } else if (r_med != 0) { // start with 1/2 TODO
+                r_small = (n_small - i_small).toDouble() / n_small
+            } else if (r_med != 0.0) { // start with 1/2
                 x[0] = med
                 i_med = 1
-                r_med = (n_med - i_med) / n_med
+                r_med = (n_med - i_med).toDouble() / n_med
             } else {
                 x[0] = big
                 i_big = 1
-                r_big = (n_big - i_big) / n_big
+                r_big = (n_big - i_big).toDouble() / n_big
             }
-            for (i in (1..N)) { // TODO wrong, should be  < N
+            for (i in (1 until N)) {
                 if (r_small > r_big) {
                     if (r_med > r_small) {
                         x[i] = med
                         i_med += 1
-                        r_med = (n_med - i_med) / n_med
+                        r_med = (n_med - i_med).toDouble() / n_med
                     } else {
                         x[i] = small
                         i_small += 1
-                        r_small = (n_small - i_small) / n_small
+                        r_small = (n_small - i_small).toDouble() / n_small
                     }
                 } else if (r_med > r_big) {
                     x[i] = med
                     i_med += 1
-                    r_med = (n_med - i_med) / n_med
+                    r_med = (n_med - i_med).toDouble() / n_med
                 } else {
                     x[i] = big
                     i_big += 1
-                    r_big = (n_big - i_big) / n_big
+                    r_big = (n_big - i_big).toDouble() / n_big
                 }
             }
             return x

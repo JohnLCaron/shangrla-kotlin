@@ -5,7 +5,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-fun setEta0(upperBound: Double) : Double {
+// initial estimate of the population mean for FixedAlternativeMean
+fun setEta0(t: Double = 0.5, upperBound: Double = 1.0) : Double {
     //    For polling audits, eta0 could be the reported mean value of the assorter.
     //	    For instance, for the assertion corresponding to checking whether w got more votes than ℓ,
     //	      η0 = (Nw + Nc/2)/N , where Nw is the number of votes reported for w , Nℓ is the
@@ -13,32 +14,29 @@ fun setEta0(upperBound: Double) : Double {
     //	   reported to have a vote for some other candidate or no valid vote in the contest.
 
     //    For comparison audits, eta0 can be based on assumed or historical rates of overstatement errors.
-    val eps = 0.0001  // Generic small value
-    val eta0 = (eps + (upperBound - eps) / 2) // initial estimate of the population mean
-    return eta0
+    return (t + (upperBound - t) / 2)
 }
 
-// Compare AlphaAlgorithm with output from start/TestNonnegMean
+// Compare AlphaAlgorithm with output from start/TestNonnegMean.testAlphaMartAllHalf
 class TestAlphaAlternativeFixedMean  {
 
     @Test
-    fun testAlphaMartAllHalf2() {
+    fun testAlphaAllHalf() {
         //        # When all the items are 1/2, estimated p for a mean of 1/2 should be 1.
         //        s = np.ones(5)/2
         //        test = NonnegMean(N=int(10**6))
         //        np.testing.assert_almost_equal(test.alpha_mart(s)[0],1.0)
         val s1 = DoubleArray(5) { .5 }
         val u = 1.0
-        val N = 100
+        val N = 1_000_000
 
-        val estimFn = FixedAlternativeMean(N, setEta0(u))
+        val estimFn = FixedAlternativeMean(N, setEta0())
         val alpha = AlphaAlgorithm(estimFn=estimFn, N=N, upperBound=u)
         val sampler = SampleFromList(s1)
         val algoValues = alpha.run(s1.size) { sampler.sample() }
 
         // run 0.75, 0.75000025000025, 0.750000500001, 0.75000075000225, 0.750001000004
-        // run2 0.75, 0.7525252525252525, 0.7551020408163265, 0.7577319587628866, 0.7604166666666666
-        doublesAreClose(listOf(0.75, 0.7525252525252525, 0.7551020408163265, 0.7577319587628866, 0.7604166666666666), algoValues.etaj)
+        doublesAreClose(listOf(0.75, 0.75000025000025, 0.750000500001, 0.75000075000225, 0.750001000004), algoValues.etaj)
         algoValues.phistory.forEach { assertEquals(1.0, it)}
     }
 
@@ -48,7 +46,7 @@ class TestAlphaAlternativeFixedMean  {
         val t = .0001
         val x = DoubleArray(5) { .5 }
 
-        val estimFn = FixedAlternativeMean(N, setEta0(1.0))
+        val estimFn = FixedAlternativeMean(N, setEta0(t))
         val alpha = AlphaAlgorithm(estimFn=estimFn, N=N, t=t)
         val sampler = SampleFromList(x)
         val algoValues = alpha.run(x.size) { sampler.sample() }
@@ -71,7 +69,7 @@ class TestAlphaAlternativeFixedMean  {
         val t = .0001
         val x = doubleArrayOf(0.6, 0.8, 1.0, 1.2, 1.4)
 
-        val estimFn = FixedAlternativeMean(N, setEta0(u))
+        val estimFn = FixedAlternativeMean(N, setEta0(t, u))
         val alpha = AlphaAlgorithm(estimFn=estimFn, N=N, upperBound=u, t=t)
 
         val sampler = SampleFromList(x)
@@ -93,7 +91,7 @@ class TestAlphaAlternativeFixedMean  {
         val t = 3.0 / 7.0
         val x1 = doubleArrayOf(1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0)
 
-        val estimFn = FixedAlternativeMean(N, setEta0(u))
+        val estimFn = FixedAlternativeMean(N, setEta0(t))
         val alpha = AlphaAlgorithm(estimFn=estimFn, N=N, upperBound=u, t=t)
 
         val sampler = SampleFromList(x1)

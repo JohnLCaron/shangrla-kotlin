@@ -1,6 +1,5 @@
 package org.cryptobiotic.shangrla.core
 
-import org.cryptobiotic.shangrla.core.*
 import org.cryptobiotic.shangrla.reader.sigfig
 import org.cryptobiotic.shangrla.core.AssertionUtils.Companion.find_margins
 import org.junit.jupiter.api.Test
@@ -212,20 +211,20 @@ class TestRaireContest {
 
         val max_cards = 8
         val prefix = "phantom-"
-        val (cvrs, nphantoms) = make_phantoms(max_cards, cvrb.builders, contests)
+        val (cvr_list, nphantoms) = make_phantoms(max_cards, cvrb.builders, contests)
 
         assertEquals(3, nphantoms)
-        println(cvrs)
-        assertEquals(9, cvrs.size)
+        println(cvr_list)
+        assertEquals(9, cvr_list.size)
 
         assertEquals(5, contests[0].ncvrs)
-        assertEquals(4, contests[0].ncvrs)
+        assertEquals(4, contests[1].ncvrs)
         assertEquals(8, contests[0].cards)
         assertEquals(5, contests[1].cards)
-        assertEquals(8, cvrb.builders.filter { it.has_contest("city_council") }.count())
-        assertEquals(5, cvrb.builders.filter { it.has_contest("measure_1") }.count())
-        assertEquals(5, cvrb.builders.filter { !it.phantom && it.has_contest("city_council") }.count())
-        assertEquals(4, cvrb.builders.filter { !it.phantom && it.has_contest("measure_1") }.count())
+        assertEquals(8, cvr_list.filter { it.has_contest("city_council") }.count())
+        assertEquals(5, cvr_list.filter { it.has_contest("measure_1") }.count())
+        assertEquals(5, cvr_list.filter { !it.phantom && it.has_contest("city_council") }.count())
+        assertEquals(4, cvr_list.filter { !it.phantom && it.has_contest("measure_1") }.count())
 
         // TODO
         //         audit.strata['stratum_1'].use_style = False

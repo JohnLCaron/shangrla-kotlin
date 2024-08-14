@@ -38,8 +38,7 @@ data class CumulativeSum(val S: DoubleArray, val Stot: Double, val indices: IntA
             ALPHA supermartingale test (with and without replacement)
             Betting martingale tests (with and without replacement)
     Some tests work for all nonnegative populations; others require a finite upper bound `u`.
-    Many of the tests have versions for sampling with replacement (`N=np.inf`) and for sampling
-    without replacement (`N` finite).
+    Many of the tests have versions for sampling with replacement (`N=np.inf`) and for sampling without replacement (`N` finite).
     Betting martingales and ALPHA martingales are different parametrizations of the same tests, but
        lead to different heuristics for selecting the parameters.
  */
@@ -153,6 +152,7 @@ class NonnegMean (
         val xp = if (etaj.size == x.size) DoubleArray(x.size) { (x[it] * etaj[it] / m [it] + (u - x[it]) * (u - etaj[it]) / (u - m[it])) / u }
                  else if (etaj.size == 1) DoubleArray(x.size) { (x[it] * etaj[0] / m [it] + (u - x[it]) * (u - etaj[0]) / (u - m[it])) / u }
         else throw RuntimeException("NonnegMean alpha_mart")
+        println("  etaj=${etaj.contentToString()}")
 
         val terms = numpy_cumprod(xp)
 

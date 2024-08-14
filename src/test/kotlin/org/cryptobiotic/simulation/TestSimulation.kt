@@ -1,10 +1,11 @@
-package org.cryptobiotic.start
+package org.cryptobiotic.simulation
 
 import org.cryptobiotic.shangrla.core.AuditType
+import org.cryptobiotic.start.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-class TestWorkflow {
+class TestSimulation {
 
     @Test
     fun testWorkflow() {
@@ -34,31 +35,16 @@ class TestWorkflow {
         audit.set_all_margins_from_cvrs(contests, cvrs)
         // println("minimum assorter margin = ${min_margin}")
 
-        contests.map { contest ->
-            println("Assertions for Contest ${contest.id}")
-            contest.assertions.forEach { println("  ${it}") }
-        }
-
         // Set up for sampling
         val sample_size = audit.find_sample_size(contests, cvrs=cvrs)
-        println("sample_size = ${sample_size}")
-
-        contests.map { contest ->
-            println("Assertions for Contest ${contest.id}")
-            contest.assertions.forEach { println("  ${it}") }
-        }
+        //println("sample_size = ${sample_size}")
+        // val sample_size = 100
 
         val samples = audit.assign_sample_nums(cvrs, sample_size).toList()
 
-        // Tst 1. suppose there are no errors, so that mvr == cvr
-        // Compute the p values
+        // Tst 1. suppose there are no errors, so that mvr == cvr Compute the p values
         val p_max = Assertion.set_p_values(contests=contests, mvr_sample=samples, cvr_sample=samples)
         println("p_max = ${p_max}")
-
-        contests.map { contest ->
-            println("Assertions for Contest ${contest.id}")
-            contest.assertions.forEach { println("  ${it}") }
-        }
 
         assertEquals(29, sample_size)
     }

@@ -2,7 +2,7 @@ package org.cryptobiotic.shangrla.core
 
 class Assorter(
     val contest: Contest,
-    val assort: (Cvr) -> Double, // maps a dict of votes into [0, upper_bound]
+    val assort: (Cvr) -> Double, // assign Ballot to [0, upper_bound]
     val upper_bound: Double, // a priori upper bound on the value the assorter can take
 ) {
     var winner:  ((Cvr) -> Int)? = null
